@@ -22,15 +22,19 @@ Synthetic Instagram Post Generation for Social Media Research
 
    This will spawn a shell within the virtual environment.
 
-### Writing Code
+
+4. **Add your OpenAI API key to the .env file**
+   ```bash
+   OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+   ```
 
 If you're using Jupyter:
 
-1. **Start Jupyter Notebook:**  
+5. **Start Jupyter Notebook:**  
    ```bash
    poetry run jupyter notebook
    ```
 
-   This will launch the Jupyter Notebook and you can navigate to the desired `.ipynb` file to use it.
+   This will launch the Jupyter Notebook, and you can navigate to the desired `.ipynb` file to use it.
 
 If you're using another notebook tool, you can usually start it within the activated Poetry shell.
