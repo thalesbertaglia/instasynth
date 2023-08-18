@@ -1,0 +1,10 @@
+{
+    "system_message": "Your are a helpful assistant... {param_1}",
+    "user_message": "{param_2} {examples} ",
+    "n_examples": null,
+    "parameters": [
+        "param_1",
+        "param_2",
+        "examples"
+    ]
+}

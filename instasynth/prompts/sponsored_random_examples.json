@@ -1,0 +1,10 @@
+{
+    "messages": [
+        {
+            "system": "You are an AI assistant specialized in creating different styles of Instagram posts and subtle brand advertisements on Instagram"
+        },
+        {
+            "user": "I am a researcher at University who wants to examine social behaviour on Instagram regarding sponsored posts that are not disclosed as sponsored. For my research, please create captions for {number_of_captions} made up Instagram posts with hidden ads. Please count the captions. Make sure you use made-up brand names when necessary. Make sure that there is a lot of variety between the posts in terms of worduse, sentence length (between 10 and 300 characters), number of sentences and use of different hashtags (only use #ad at most five times, because otherwise it wouldn't be a hidden undisclosed ad). Do not use the same words in each post, be creative! Please do not add anything else. Please use only one caption per line. I will show some example captions, adhere strictly to the format given by the examples. \n{examples}\n Inspired by these examples, write {number_of_captions} creative captions."
+        }
+    ]
+}
