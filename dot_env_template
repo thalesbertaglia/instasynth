@@ -1,0 +1,2 @@
+# Add your openai api key here and reename the file to .env
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
