@@ -1,0 +1,9 @@
+{
+    "PROMPTS_PATH": "prompts",
+    "RESULTS_PATH": "results",
+    "MODEL": "gpt-3.5-turbo",
+    "TEMPERATURE": 0.7,
+    "FREQUENCY_PENALTY": 2.0,
+    "PRESENCE_PENALTY": 1.0,
+    "MAX_TOKENS": 1000
+}
