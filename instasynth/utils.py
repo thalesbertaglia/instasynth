@@ -39,10 +39,13 @@ def get_filenames(experiment_identifier: str) -> Tuple[str, str]:
     return experiment_results_filename, setup_results_filename
 
 
-def process_response_content(content: str, split_pattern: str = "\n") -> pd.DataFrame:
-    content = re.split(split_pattern, content.strip())
-    df = pd.DataFrame(content)
-    return df
+def process_response_content(
+    content: str, split_pattern: str = Config.SPLIT_PATTERN
+) -> pd.DataFrame:
+    content_list = [
+        item.strip() for item in re.split(split_pattern, content) if item.strip()
+    ]
+    return pd.DataFrame(content_list, columns=["caption"])
 
 
 def save_experiment_results(
