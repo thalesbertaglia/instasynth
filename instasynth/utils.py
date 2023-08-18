@@ -1,3 +1,4 @@
+import re
 import json
 from typing import List, Dict, Tuple, Union, Any
 from pathlib import Path
@@ -38,8 +39,8 @@ def get_filenames(experiment_identifier: str) -> Tuple[str, str]:
     return experiment_results_filename, setup_results_filename
 
 
-def process_response_content(content: str) -> pd.DataFrame:
-    content = content.split("\n")
+def process_response_content(content: str, split_pattern: str = "\n") -> pd.DataFrame:
+    content = re.split(split_pattern, content.strip())
     df = pd.DataFrame(content)
     return df
 
