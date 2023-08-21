@@ -46,7 +46,7 @@ class DataGenerator:
                 messages=messages, **self.model_parameters
             )
             arguments = response["choices"][0]["message"]["function_call"]["arguments"]
-            return response, arguments, dict(response["usage"])
+            return response, arguments
         except Exception as e:
             logger.error(e)
             return "API_ERROR"
