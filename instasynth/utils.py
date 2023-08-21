@@ -1,6 +1,6 @@
 import re
 import json
-from typing import List, Dict, Tuple, Union, Any
+from typing import List, Dict, Tuple, Union, Any, Optional
 from pathlib import Path
 
 import pandas as pd
@@ -58,7 +58,14 @@ def save_experiment_results(
         experiment_identifier
     )
 
-    experiment_results.to_pickle(experiment_results_filename, index=False)
+    try:
+        experiment_results.to_pickle(experiment_results_filename)
+    except Exception as e:
+        logger.error(e)
+        with open(
+            experiment_results_filename.replace(".pkl", ".json"), "w", encoding="utf-8"
+        ) as f:
+            json.dump(experiment_results, f, ensure_ascii=False)
     with open(setup_results_filename, "w", encoding="utf-8") as f:
         json.dump(setup_experiment, f, ensure_ascii=False)
 
@@ -85,3 +92,24 @@ def format_json_string(json_str: str) -> str:
     json_str = re.sub(r",\s*([}\]])", r"\1", json_str)
 
     return json_str
+
+
+def format_examples(examples: list) -> str:
+    """Format examples for display."""
+    return "".join(
+        [f"<POST#{index}> {example}\n" for index, example in enumerate(examples)]
+    )
+
+
+def sample_examples(
+    df: pd.DataFrame,
+    n_examples: int,
+    is_sponsored: bool = False,
+    sponsorship_column: str = "has_disclosures",
+    random_seed: Optional[int] = None,
+) -> Tuple[List[str], List[str]]:
+    examples = df.query(f"{sponsorship_column} == {is_sponsored}").sample(
+        n_examples, random_state=random_seed
+    )[["shortcode", "caption"]]
+
+    return format_examples(examples["caption"].tolist()), examples["shortcode"].tolist()

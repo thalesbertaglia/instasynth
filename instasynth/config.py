@@ -68,8 +68,8 @@ class Config:
         _json_config = load_json_config()
         for k, v in _json_config.items():
             setattr(cls, k, v)
-        setattr(cls, "PROMPTS_FOLDER", Path(cls.PROMPTS_PATH))
-        setattr(cls, "RESULTS_FOLDER", Path(cls.RESULTS_PATH))
+            if "PATH" in k:
+                setattr(cls, k.replace("PATH", "FOLDER"), Path(v))
         setattr(cls, "FUNCTIONS", functions)
         setattr(cls, "FUNCTION_CALL", function_call)
 
