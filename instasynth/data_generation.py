@@ -66,4 +66,4 @@ class DataGenerator:
         messages = self.create_prompt_messages(prompt_json["messages"], parameters)
         response = self.get_completion_from_messages(messages, **chatgpt_parameters)
 
-        return response
+        return response, messages
