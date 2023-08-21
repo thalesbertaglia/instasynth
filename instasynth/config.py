@@ -30,8 +30,29 @@ console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 logger.propagate = False
 
-
+# API key
 load_dotenv(find_dotenv())
+
+# Base function
+functions = [
+    {
+        "name": "get_instagram_post",
+        "description": "This function generates new captions of instagram posts based on a set of examples.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "posts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "list with new Instagram posts.",
+                }
+            },
+            "required": ["posts"],
+        },
+    }
+]
+
+function_call = {"name": "get_instagram_post"}
 
 
 def load_json_config():
@@ -49,6 +70,8 @@ class Config:
             setattr(cls, k, v)
         setattr(cls, "PROMPTS_FOLDER", Path(cls.PROMPTS_PATH))
         setattr(cls, "RESULTS_FOLDER", Path(cls.RESULTS_PATH))
+        setattr(cls, "FUNCTIONS", functions)
+        setattr(cls, "FUNCTION_CALL", function_call)
 
 
 Config.load_attributes()

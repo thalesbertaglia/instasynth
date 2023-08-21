@@ -31,6 +31,8 @@ def create_openai_messages(
 def get_completion_from_messages(
     messages: List[Dict[str, str]],
     model: str = Config.MODEL,
+    functions: List[Dict] = Config.FUNCTIONS,
+    function_call: Dict = Config.FUNCTION_CALL,
     temperature: float = Config.TEMPERATURE,
     frequency_penalty: float = Config.FREQUENCY_PENALTY,
     presence_penalty: float = Config.PRESENCE_PENALTY,
@@ -39,6 +41,8 @@ def get_completion_from_messages(
     try:
         response = openai.ChatCompletion.create(
             model=model,
+            functions=functions,
+            function_call=function_call,
             messages=messages,
             temperature=temperature,
             frequency_penalty=frequency_penalty,
@@ -47,14 +51,21 @@ def get_completion_from_messages(
             # n=2,
         )
 
-        return response, response.choices[0].message["content"], dict(response["usage"])
+        return (
+            response,
+            response["choices"][0]["message"]["function_call"]["arguments"],
+            dict(response["usage"]),
+        )
     except Exception as e:
         logger.error(e)
         return "API_ERROR"
 
 
 def create_experiment(
-    experiment_identifier: str, prompt_name: str, parameters: Dict[str, str]
+    experiment_identifier: str,
+    prompt_name: str,
+    parameters: Dict[str, str],
+    chatgpt_parameters: Dict[str, str] = {},
 ) -> Tuple[pd.DataFrame, Dict[str, Union[str, Dict[str, str]]]]:
     logger.info(
         f"Running experiment {experiment_identifier} with prompt {prompt_name} and parameters {parameters}"
@@ -62,10 +73,10 @@ def create_experiment(
     experiment_results_filename, _ = get_filenames(experiment_identifier)
     prompt_json = read_prompt_json(prompt_name)
     messages = create_openai_messages(prompt_json["messages"], parameters)
-
+    print(messages)
     logger.info("Sending messages to OpenAI API...")
     full_response, response_content, response_usage = get_completion_from_messages(
-        messages
+        messages, **chatgpt_parameters
     )
     logger.info("Received response from OpenAI API!")
 
@@ -76,12 +87,13 @@ def create_experiment(
         "prompt_name": prompt_name,
         "df_results": experiment_results_filename,
         "parameters": parameters,
+        "chatgpt_parameters": chatgpt_parameters,
         "response_usage": dict(response_usage),
     }
     logger.info("Storing results...")
     save_experiment_results(experiment_identifier, experiment_results, setup_experiment)
     logger.info("Experiment complete!")
-    return experiment_results, setup_experiment
+    return experiment_results, setup_experiment, full_response
 
 
 def create_setup_dict(
