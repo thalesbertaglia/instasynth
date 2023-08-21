@@ -64,8 +64,6 @@ class DataGenerator:
 
         prompt_json = utils.read_prompt_json(prompt_name)
         messages = self.create_prompt_messages(prompt_json["messages"], parameters)
-        logger.info("Sending messages to OpenAI API...")
         response = self.get_completion_from_messages(messages, **chatgpt_parameters)
-        logger.info("Received response from OpenAI API!")
 
         return response
