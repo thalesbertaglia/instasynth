@@ -168,6 +168,7 @@ class Experiment:
         logger.info(
             f"Running experiment {self.experiment_identifier}. Generating {self.sponsored_count} sponsored posts and {self.nonsponsored_count} non-sponsored posts."
         )
+        self.save_experiment_setup()
         # Loop over the two types of posts
         for is_sponsored in [True, False]:
             self._iteration_state = 0
@@ -186,7 +187,6 @@ class Experiment:
                 self.run_single(is_sponsored=is_sponsored, df_sample=df_sample)
                 generated_posts_count = sum((len(k) for k in self.results[sponsorship]))
         logger.info("Finished generating all posts!")
-        self.save_experiment_setup()
         df = self.saving_manager.save_final_results(results=self.results)
         return df
 
