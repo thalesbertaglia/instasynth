@@ -70,6 +70,7 @@ class Config:
             setattr(cls, k, v)
             if "PATH" in k:
                 setattr(cls, k.replace("PATH", "FOLDER"), Path(v))
+                Path(v).mkdir(parents=True, exist_ok=True)
         setattr(cls, "FUNCTIONS", functions)
         setattr(cls, "FUNCTION_CALL", function_call)
 
