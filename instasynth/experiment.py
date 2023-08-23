@@ -115,9 +115,14 @@ class Experiment:
     _n_requests: int = 0
 
     def __post_init__(self):
-        self.saving_manager: SavingManager = SavingManager(self.experiment_identifier)
-        self.parameters_template["number_of_captions"] = self.captions_per_prompt
         logger.name = f"{logger.name} ({self.experiment_identifier})"
+        # Adding additional parameters that could be used for the prompt
+        if "number_of_captions" not in self.parameters_template:
+            self.parameters_template["number_of_captions"] = self.captions_per_prompt
+        if "example_delimiter" not in self.parameters_template:
+            self.parameters_template["example_delimiter"] = self.example_delimiter
+        # Saving the initial experiment setup
+        self.saving_manager: SavingManager = SavingManager(self.experiment_identifier)
 
     def sponsorship_type(self, is_sponsored: bool) -> str:
         return (
