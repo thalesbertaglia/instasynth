@@ -65,7 +65,13 @@ def fix_json_string(json_str: str) -> str:
 def format_examples(examples: list, delimiter: str) -> str:
     def format_example(example):
         fixed_example = (
-            example.replace('"', " ").replace("'", " ").replace(delimiter, " ")
+            example.replace('"', " ")
+            .replace("'", " ")
+            .replace("“", " ")
+            .replace("’", " ")
+            .replace("‘", " ")
+            .replace("⠀", "")
+            .replace(delimiter, " ")
         )
         fixed_example = re.sub(r"\s+", " ", fixed_example)
         return fixed_example
