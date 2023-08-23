@@ -62,11 +62,16 @@ def fix_json_string(json_str: str) -> str:
     return whitespace_cleaned
 
 
-def format_examples(examples: list) -> str:
+def format_examples(examples: list, delimiter: str) -> str:
+    def format_example(example):
+        fixed_example = (
+            example.replace('"', " ").replace("'", " ").replace(delimiter, " ")
+        )
+        fixed_example = re.sub(r"\s+", " ", fixed_example)
+        return fixed_example
+
     """Format examples for display."""
-    return "".join(
-        [f"<POST#{index}> {example}\n" for index, example in enumerate(examples)]
-    )
+    return "".join([f"{delimiter}{format_example(example)}\n" for example in examples])
 
 
 def sample_examples(
@@ -75,9 +80,13 @@ def sample_examples(
     is_sponsored: bool = False,
     sponsorship_column: str = "has_disclosures",
     random_seed: Optional[int] = None,
+    delimiter: str = "####",
 ) -> Tuple[List[str], List[str]]:
     examples = df.query(f"{sponsorship_column} == {is_sponsored}").sample(
         n_examples, random_state=random_seed
     )[["shortcode", "caption"]]
 
-    return format_examples(examples["caption"].tolist()), examples["shortcode"]
+    return (
+        format_examples(examples["caption"].tolist(), delimiter),
+        examples["shortcode"],
+    )

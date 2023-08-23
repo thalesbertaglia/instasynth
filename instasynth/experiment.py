@@ -100,6 +100,7 @@ class Experiment:
     nonsponsored_count: int
     captions_per_prompt: int = Config.CAPTIONS_PER_PROMPT
     number_of_examples: int = 0
+    example_delimiter: str = Config.EXAMPLE_DELIMITER
     sample_examples: bool = False
     data_generator: DataGenerator = field(default_factory=DataGenerator)
     # Additional parameters to be passed to the prompt (e.g. fixed examples)
@@ -136,6 +137,7 @@ class Experiment:
                 df=df_sample,
                 n_examples=self.number_of_examples,
                 is_sponsored=is_sponsored,
+                delimiter=self.example_delimiter,
             )
             parameters[
                 "examples"
