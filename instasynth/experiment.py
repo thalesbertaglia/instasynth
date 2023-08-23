@@ -20,6 +20,9 @@ class SavingManager:
         Path(self.experiment_results_filename / "prompt_examples").mkdir(
             parents=True, exist_ok=True
         )
+        Path(self.experiment_results_filename / "errors").mkdir(
+            parents=True, exist_ok=True
+        )
 
     def save_iteration_results(
         self,
@@ -51,6 +54,13 @@ class SavingManager:
             examples_shortcodes.to_pickle(
                 f"{self.experiment_results_filename}/prompt_examples/{sponsorship}_{iteration_state}.pkl"
             )
+
+    def save_error_post(self, error_post: str, sponsorship: str, iteration_state: int):
+        with open(
+            f"{self.experiment_results_filename}/errors/{sponsorship}_{iteration_state}.txt",
+            "w",
+        ) as f:
+            f.write(error_post)
 
     def save_final_results(
         self, results: Dict[str, List[Dict[str, Any]]]
@@ -163,6 +173,9 @@ class Experiment:
 
         except Exception as e:
             logger.error(f"Failed to process response ({e}). Continuing...")
+            self.saving_manager.save_error_post(
+                response_content, sponsorship, self._iteration_state
+            )
 
     def run(self, df_sample: pd.DataFrame = None):
         logger.info(
