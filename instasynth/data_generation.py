@@ -48,8 +48,7 @@ class DataGenerator:
             arguments = response["choices"][0]["message"]["function_call"]["arguments"]
             return response, arguments
         except Exception as e:
-            logger.error(e)
-            return "API_ERROR"
+            raise e
 
     def generate_data(
         self,

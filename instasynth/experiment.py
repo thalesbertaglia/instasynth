@@ -1,3 +1,4 @@
+import time
 import json
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List
@@ -116,6 +117,7 @@ class Experiment:
     def __post_init__(self):
         self.saving_manager: SavingManager = SavingManager(self.experiment_identifier)
         self.parameters_template["number_of_captions"] = self.captions_per_prompt
+        logger.name = f"{logger.name} ({self.experiment_identifier})"
 
     def sponsorship_type(self, is_sponsored: bool) -> str:
         return (
@@ -143,11 +145,23 @@ class Experiment:
                 "examples"
             ] = f"<EXAMPLES> {examples} </EXAMPLES>\n\n Now I will give you instructions: "
 
-        (full_response, response_content), messages = self.data_generator.generate_data(
-            prompt_name=prompt_name,
-            parameters=parameters,
-            chatgpt_parameters=self.chatgpt_parameters,
-        )
+        # If the API fails, sleep for 60 seconds and continue
+        try:
+            (
+                full_response,
+                response_content,
+            ), messages = self.data_generator.generate_data(
+                prompt_name=prompt_name,
+                parameters=parameters,
+                chatgpt_parameters=self.chatgpt_parameters,
+            )
+        except Exception as e:
+            logger.error(
+                f"API request failed {e}. Sleeping for 60 seconds and continuing..."
+            )
+            time.sleep(60)
+            return
+
         # If formatting the response fails, ignore this run and continue
         try:
             generated_posts = utils.process_response_content(content=response_content)
