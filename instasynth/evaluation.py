@@ -14,7 +14,6 @@ from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
 from nltk.tokenize import TweetTokenizer
@@ -189,7 +188,6 @@ class TextAnalyser:
 
 @dataclass
 class ClassificationAnalyser:
-    identifier: str = ""
     data: pd.DataFrame
     evaluation_data: pd.DataFrame
     text_column: str = "caption"
@@ -219,27 +217,30 @@ class ClassificationAnalyser:
     def train(self, X_train, y_train) -> None:
         self.__MODEL.fit(X_train, y_train)
 
-    def evaluate(self, X_test, y_test) -> Dict[str, float]:
+    def evaluate(self, X_test, y_test, identifier: str) -> Dict[str, float]:
         predictions = self.__MODEL.predict(X_test)
         metrics = {
             # f"{self.identifier}_accuracy": accuracy_score(y_test, predictions),
-            f"{self.identifier}_precision": precision_score(y_test, predictions),
-            f"{self.identifier}_recall": recall_score(y_test, predictions),
-            f"{self.identifier}_f1_score": f1_score(y_test, predictions),
+            f"{identifier}_precision": precision_score(y_test, predictions),
+            f"{identifier}_recall": recall_score(y_test, predictions),
+            f"{identifier}_f1_score": f1_score(y_test, predictions),
         }
         return metrics
 
-    def ad_detection(self) -> Dict[str, float]:
+    def ad_detection_performance(self) -> Dict[str, float]:
         X_train, y_train = self._preprocess(self.data)
         X_test, y_test = self._preprocess(self.evaluation_data)
         self.train(X_train, y_train)
-        return self.evaluate(X_test, y_test)
+        return self.evaluate(X_test, y_test, "ad_detection")
 
 
 @dataclass
 class ExperimentEvaluator:
     experiment_paths: List[Path]
+    # Real dataset to compare with
     real_dataset: Optional[pd.DataFrame] = None
+    # Test dataset to evaluate ad detection performance
+    test_dataset_ads: Optional[pd.DataFrame] = None
 
     _experiment_metrics: Dict[str, Dict[str, Union[int, float]]] = field(
         default_factory=dict, init=False
@@ -253,6 +254,11 @@ class ExperimentEvaluator:
         data = loader.get_experiment_final_df()
         analyser = TextAnalyser(data)
         data_metrics = analyser.analyse_data().to_dict()["Value"]
+        if self.test_dataset_ads is not None:
+            classifier = ClassificationAnalyser(
+                data=data, evaluation_data=self.test_dataset_ads
+            )
+            data_metrics.update(classifier.ad_detection_performance())
         data_metrics.update(loader.extract_metrics())
         return data_metrics
 
