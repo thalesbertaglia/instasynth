@@ -147,7 +147,7 @@ class Experiment:
                 delimiter=self.example_delimiter,
             )
             parameters[
-                "examples"
+                f"{sponsorship}_examples"
             ] = f"<EXAMPLES> {examples} </EXAMPLES>\n\n Now I will give you instructions: "
 
         # If the API fails, sleep for 60 seconds and continue
