@@ -140,6 +140,7 @@ class TextAnalyser:
     def _basic_metrics(self) -> Dict[str, float]:
         return {
             "avg_caption_length": self.tokenized_captions.apply(len).mean(),
+            "std_caption_length": self.tokenized_captions.apply(len).std(),
             "vocabulary_size": pd.Series(
                 token
                 for tokens in self.tokenized_captions
