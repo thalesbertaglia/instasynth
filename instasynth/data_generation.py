@@ -60,9 +60,11 @@ class DataGenerator:
             parameters = {}
         if chatgpt_parameters is None:
             chatgpt_parameters = {}
+        else:
+            self.model_parameters.update(chatgpt_parameters)
 
         prompt_json = utils.read_prompt_json(prompt_name)
         messages = self.create_prompt_messages(prompt_json["messages"], parameters)
-        response = self.get_completion_from_messages(messages, **chatgpt_parameters)
+        response = self.get_completion_from_messages(messages)
 
         return response, messages
