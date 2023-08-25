@@ -222,10 +222,10 @@ class ClassificationAnalyser:
     def evaluate(self, X_test, y_test, identifier: str) -> Dict[str, float]:
         predictions = self.__MODEL.predict(X_test)
         metrics = {
-            # f"{self.identifier}_accuracy": accuracy_score(y_test, predictions),
+            f"{identifier}_accuracy": accuracy_score(y_test, predictions),
             f"{identifier}_precision": precision_score(y_test, predictions),
             f"{identifier}_recall": recall_score(y_test, predictions),
-            f"{identifier}_f1_score": f1_score(y_test, predictions),
+            f"{identifier}_f1": f1_score(y_test, predictions),
         }
         return metrics
 
@@ -236,9 +236,9 @@ class ClassificationAnalyser:
         performance_metrics = self.evaluate(X_test, y_test, "ad_detection")
         if self.evaluation_data_ann is not None:
             X_test_ann, y_test_ann = self._preprocess(self.evaluation_data_ann)
-            performance_metrics.update(
-                self.evaluate(X_test_ann, y_test_ann, "ad_detection_undisclosed")
-            )
+            performance_metrics["ad_detection_undisclosed_accuracy"] = self.evaluate(
+                X_test_ann, y_test_ann, "ad_detection_undisclosed"
+            )["ad_detection_undisclosed_accuracy"]
         return performance_metrics
 
 
