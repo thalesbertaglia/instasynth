@@ -190,6 +190,8 @@ class TextAnalyser:
 class ClassificationAnalyser:
     data: pd.DataFrame
     evaluation_data: pd.DataFrame
+    # Annotated data to evaluate ad detection performance on undisclosed posts
+    evaluation_data_ann: Optional[pd.DataFrame] = None
     text_column: str = "caption"
     target_column: str = "sponsorship"
 
@@ -231,7 +233,13 @@ class ClassificationAnalyser:
         X_train, y_train = self._preprocess(self.data)
         X_test, y_test = self._preprocess(self.evaluation_data)
         self.train(X_train, y_train)
-        return self.evaluate(X_test, y_test, "ad_detection")
+        performance_metrics = self.evaluate(X_test, y_test, "ad_detection")
+        if self.evaluation_data_ann is not None:
+            X_test_ann, y_test_ann = self._preprocess(self.evaluation_data_ann)
+            performance_metrics.update(
+                self.evaluate(X_test_ann, y_test_ann, "ad_detection_undisclosed")
+            )
+        return performance_metrics
 
 
 @dataclass
