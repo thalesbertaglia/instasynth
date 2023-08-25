@@ -196,7 +196,7 @@ class ClassificationAnalyser:
     target_column: str = "sponsorship"
 
     __VECTORIZER: ClassVar[TfidfVectorizer] = TfidfVectorizer()
-    __MODEL: ClassVar[LogisticRegression] = LogisticRegression()
+    __MODEL: ClassVar[LogisticRegression] = LogisticRegression(random_state=42)
 
     def __post_init__(self):
         if (
