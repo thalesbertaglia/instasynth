@@ -249,6 +249,8 @@ class ExperimentEvaluator:
     real_dataset: Optional[pd.DataFrame] = None
     # Test dataset to evaluate ad detection performance
     test_dataset_ads: Optional[pd.DataFrame] = None
+    # Test dataset to evaluate ad detection performance on undisclosed ads
+    test_dataset_ads_undisclosed: Optional[pd.DataFrame] = None
 
     _experiment_metrics: Dict[str, Dict[str, Union[int, float]]] = field(
         default_factory=dict, init=False
@@ -264,7 +266,9 @@ class ExperimentEvaluator:
         data_metrics = analyser.analyse_data().to_dict()["Value"]
         if self.test_dataset_ads is not None:
             classifier = ClassificationAnalyser(
-                data=data, evaluation_data=self.test_dataset_ads
+                data=data,
+                evaluation_data=self.test_dataset_ads,
+                evaluation_data_ann=self.test_dataset_ads_undisclosed,
             )
             data_metrics.update(classifier.ad_detection_performance())
         data_metrics.update(loader.extract_metrics())
