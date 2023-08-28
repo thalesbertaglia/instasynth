@@ -261,7 +261,7 @@ class ExperimentEvaluator:
 
     def _load_and_analyse_experiment(self, path: Path) -> Dict[str, Union[int, float]]:
         loader = ExperimentLoader(path)
-        data = loader.get_experiment_final_df()
+        data = loader.get_experiment_final_df().dropna()
         analyser = TextAnalyser(data)
         data_metrics = analyser.analyse_data().to_dict()["Value"]
         if self.test_dataset_ads is not None:
@@ -291,6 +291,13 @@ class ExperimentEvaluator:
             raise ValueError("Real dataset not provided.")
         analyser = TextAnalyser(self.real_dataset)
         self._real_dataset_metrics = analyser.analyse_data().to_dict()["Value"]
+        if self.test_dataset_ads is not None:
+            classifier = ClassificationAnalyser(
+                data=self.real_dataset,
+                evaluation_data=self.test_dataset_ads,
+                evaluation_data_ann=self.test_dataset_ads_undisclosed,
+            )
+            self._real_dataset_metrics.update(classifier.ad_detection_performance())
 
     def compare_metrics(self) -> pd.DataFrame:
         if not self._experiment_metrics or not self._real_dataset_metrics:
