@@ -8,6 +8,8 @@ from typing import Dict, Any, ClassVar, List
 import tiktoken
 from openai.embeddings_utils import get_embedding
 
+from .config import logger
+
 
 @dataclass
 class EmbeddingStorage:
@@ -80,7 +82,9 @@ class EmbeddingGenerator:
         return None
 
     def generate_and_store(self) -> None:
-        for text in self.texts:
+        for i, text in enumerate(self.texts):
+            if i % 100 == 0:
+                logger.info(f"Generating embedding for text {i+1}/{len(self.texts)}")
             if not self.embedding_storage.check_if_embedded(text):
                 embedding = self._generate_embedding(text)
                 self.embeddings[text] = embedding
