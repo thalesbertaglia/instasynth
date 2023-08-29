@@ -18,6 +18,9 @@ import pandas as pd
 import numpy as np
 from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
+import faiss
+
+from .embedding_generation import EmbeddingStorage
 
 
 @dataclass
@@ -112,6 +115,10 @@ class TextAnalyser:
             )
         return self._tokenized_captions
 
+    @property
+    def vocabulary(self) -> Set[str]:
+        return set(self.tokenized_captions.sum())
+
     def _extract_from_pattern(
         self, tokens: List[str], pattern: re.Pattern
     ) -> List[str]:
@@ -142,12 +149,7 @@ class TextAnalyser:
         return {
             "avg_caption_length": self.tokenized_captions.apply(len).mean(),
             "std_caption_length": self.tokenized_captions.apply(len).std(),
-            "vocabulary_size": pd.Series(
-                token
-                for tokens in self.tokenized_captions
-                for token in tokens
-                if token not in self._stopwords
-            ).nunique(),
+            "vocabulary_size": len(self.vocabulary),
             "avg_emojis_per_post": self.data["caption"].apply(emoji.emoji_count).mean(),
             "std_emojis_per_post": self.data["caption"].apply(emoji.emoji_count).std(),
             "n_unique_emojis": len(
