@@ -101,6 +101,8 @@ class TextAnalyser:
 
         self._stopwords = set(stopwords.words("english"))
         self.tokenizer = TweetTokenizer(preserve_case=False)
+        # Fixing hashtags with multiple consecutive #, usually generated because of the #### separator
+        self.data["caption"] = self.data["caption"].str.replace(r"#{2,}", "#")
 
     @property
     def tokenized_captions(self) -> pd.Series:
