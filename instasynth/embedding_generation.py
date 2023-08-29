@@ -14,17 +14,22 @@ class EmbeddingStorage:
     storage_path: Path
     embedding_file_name: str = "embeddings.pkl"
     _embeddings_file: Path = field(init=False)
+    _hash_file: Path = field(init=False)
     _hash_embeddings: Dict[str, Any] = field(
         init=False, default_factory=dict, repr=False
     )
+    _hash_map: Dict[str, str] = field(init=False, default_factory=dict, repr=False)
 
     def __post_init__(self):
         self._embeddings_file = self.storage_path / self.embedding_file_name
+        self._hash_file = self.storage_path / f".hash_{self.embedding_file_name}"
         # Attempt to load from the pickle file during initialization
         self.load_from_disk()
 
     def _generate_hash(self, text: str) -> str:
-        return hashlib.sha256(text.encode()).hexdigest()
+        hash = hashlib.sha256(text.encode()).hexdigest()
+        self._hash_map[hash] = text
+        return hash
 
     def store_embedding(self, text: str, embedding: Any) -> None:
         text_hash = self._generate_hash(text)
@@ -32,15 +37,23 @@ class EmbeddingStorage:
         self._save_to_disk()
 
     def _save_to_disk(self) -> None:
-        with self._embeddings_file.open("wb") as file:
+        with self._embeddings_file.open("wb") as file, self._hash_file.open(
+            "wb"
+        ) as hash_file:
             pickle.dump(self._hash_embeddings, file)
+            pickle.dump(self._hash_map, hash_file)
 
     def load_from_disk(self) -> None:
         try:
-            with self._embeddings_file.open("rb") as file:
+            with self._embeddings_file.open("rb") as file, self._hash_file.open(
+                "rb"
+            ) as hash_file:
                 self._hash_embeddings = pickle.load(file)
+                self._hash_map = pickle.load(hash_file)
+
         except FileNotFoundError:
             self._hash_embeddings = {}
+            self._hash_map = {}
 
     def check_if_embedded(self, text: str) -> bool:
         text_hash = self._generate_hash(text)
