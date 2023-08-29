@@ -12,14 +12,12 @@ from openai.embeddings_utils import get_embedding
 @dataclass
 class EmbeddingStorage:
     storage_path: Path
+    embedding_file_name: str = "embeddings.pkl"
     _embeddings_file: Path = field(init=False)
     _hash_embeddings: Dict[str, Any] = field(init=False, default_factory=dict)
 
-    # Constants for directory and file names
-    EMBEDDINGS_FILE: ClassVar[str] = "embeddings.pkl"
-
     def __post_init__(self):
-        self._embeddings_file = self.storage_path / self.EMBEDDINGS_FILE
+        self._embeddings_file = self.storage_path / self.embedding_file_name
         # Attempt to load from the pickle file during initialization
         self.load_from_disk()
 
