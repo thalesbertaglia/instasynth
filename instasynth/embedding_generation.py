@@ -14,7 +14,9 @@ class EmbeddingStorage:
     storage_path: Path
     embedding_file_name: str = "embeddings.pkl"
     _embeddings_file: Path = field(init=False)
-    _hash_embeddings: Dict[str, Any] = field(init=False, default_factory=dict)
+    _hash_embeddings: Dict[str, Any] = field(
+        init=False, default_factory=dict, repr=False
+    )
 
     def __post_init__(self):
         self._embeddings_file = self.storage_path / self.embedding_file_name
@@ -53,7 +55,7 @@ class EmbeddingStorage:
 class EmbeddingGenerator:
     embedding_storage: EmbeddingStorage
     texts: List[str]
-    embeddings: Dict[str, Any] = field(default_factory=dict)
+    embeddings: Dict[str, Any] = field(default_factory=dict, repr=False)
     embedding_model = "text-embedding-ada-002"
     embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
     encoding = tiktoken.get_encoding(embedding_encoding)
