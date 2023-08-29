@@ -5,8 +5,10 @@ from dataclasses import dataclass, field
 import openai
 import pandas as pd
 
-from .config import Config, logger
+from .config import Config
 from . import utils
+
+Config.load_attributes()
 
 
 @dataclass

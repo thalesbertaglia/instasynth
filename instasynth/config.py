@@ -4,6 +4,8 @@ import json
 import logging
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from typing import Dict
+from dataclasses import dataclass
 
 from dotenv import load_dotenv, find_dotenv
 
@@ -55,17 +57,16 @@ functions = [
 function_call = {"name": "get_instagram_post"}
 
 
-def load_json_config():
-    with open("../config.json", "r") as f:
-        return json.load(f)
-
-
+@dataclass
 class Config:
     OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+    config_json_path: str = "../config.json"
 
     @classmethod
-    def load_attributes(cls):
-        _json_config = load_json_config()
+    def load_attributes(cls, config_json_path: str = None):
+        if config_json_path:
+            cls.config_json_path = config_json_path
+        _json_config = cls.load_json_config()
         for k, v in _json_config.items():
             setattr(cls, k, v)
             if "PATH" in k:
@@ -74,5 +75,7 @@ class Config:
         setattr(cls, "FUNCTIONS", functions)
         setattr(cls, "FUNCTION_CALL", function_call)
 
-
-Config.load_attributes()
+    @classmethod
+    def load_json_config(cls) -> Dict:
+        with open(cls.config_json_path, "r") as f:
+            return json.load(f)

@@ -7,6 +7,8 @@ import pandas as pd
 
 from .config import Config, logger
 
+Config.load_attributes()
+
 
 def load_json_config() -> Dict[str, Any]:
     with open("config.json", "r") as f:

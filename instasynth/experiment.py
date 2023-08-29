@@ -11,6 +11,8 @@ from .config import Config, logger
 from .data_generation import DataGenerator
 from . import utils
 
+Config.load_attributes()
+
 
 class SavingManager:
     def __init__(self, experiment_identifier: str):
