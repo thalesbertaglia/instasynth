@@ -19,6 +19,9 @@ nltk = "^3.8.1"
 emoji = "^2.8.0"
 seaborn = "^0.12.2"
 scikit-learn = "^1.3.0"
+tiktoken = "^0.4.0"
+faiss-cpu = "^1.7.4"
+plotly = "^5.16.1"
 
 
 [build-system]
