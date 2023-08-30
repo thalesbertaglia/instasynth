@@ -3,6 +3,7 @@ import json
 from typing import Dict, List, Tuple, ClassVar, Set, Union, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections import Counter
 
 import pandas as pd
 import numpy as np
@@ -94,8 +95,9 @@ class ExperimentLoader:
 class TextAnalyser:
     data: pd.DataFrame
     _tokenized_captions: pd.Series = None
+    _ngrams: Dict[int, List[str]] = field(default_factory=dict, repr=False)
     _vocabulary: Set[str] = None
-    _stopwords: Set[str] = field(default_factory=set)
+    _stopwords: Set[str] = field(default_factory=set, repr=False)
     __HASHTAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"#(\w+)")
     __USER_TAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"@(\w+)")
 
@@ -122,6 +124,15 @@ class TextAnalyser:
             self._vocabulary = set(self.tokenized_captions.sum())
         return self._vocabulary
 
+    def _extract_ngrams(self, n: int) -> List[str]:
+        if n not in self._ngrams:
+            self._ngrams[n] = [
+                ngram
+                for caption in self.tokenized_captions
+                for ngram in ngrams(caption, n)
+            ]
+        return self._ngrams[n]
+
     def _extract_from_pattern(
         self, tokens: List[str], pattern: re.Pattern
     ) -> List[str]:
@@ -140,13 +151,6 @@ class TextAnalyser:
         std = extracted.str.len().std()
         total_extracted = pd.Series([item for sublist in extracted for item in sublist])
         return avg_per_post, std, total_extracted
-
-    def analyse_data(self) -> pd.DataFrame:
-        metrics = self._basic_metrics()
-        metrics.update(self._pattern_based_metrics())
-        metrics.update(self._text_complexity_metrics())
-        metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
-        return metrics_df
 
     def _basic_metrics(self) -> Dict[str, float]:
         return {
@@ -191,6 +195,25 @@ class TextAnalyser:
             "avg_dalle_readability": dalle_readability.mean(),
             "std_dalle_readability": dalle_readability.std(),
         }
+
+    def _ngram_metrics(self) -> Dict[str, float]:
+        metrics = {}
+        for n in [1, 2, 3]:
+            ngrams = self._extract_ngrams(n)
+            metrics[f"avg_{n}gram_per_post"] = len(ngrams) / len(self.data)
+            metrics[f"n_unique_{n}gram"] = len(set(ngrams))
+        return metrics
+
+    def _get_top_ngrams(self, n: int, top_k: int = 1000) -> List[Tuple[str, int]]:
+        return Counter(self._extract_ngrams(n)).most_common(top_k)
+
+    def analyse_data(self) -> pd.DataFrame:
+        metrics = self._basic_metrics()
+        metrics.update(self._pattern_based_metrics())
+        metrics.update(self._text_complexity_metrics())
+        metrics.update(self._ngram_metrics())
+        metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
+        return metrics_df
 
 
 @dataclass
