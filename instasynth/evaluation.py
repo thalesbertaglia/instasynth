@@ -94,6 +94,7 @@ class ExperimentLoader:
 @dataclass
 class TextAnalyser:
     data: pd.DataFrame
+    remove_stopwords: bool = False
     _tokenized_captions: pd.Series = None
     _ngrams: Dict[int, List[str]] = field(default_factory=dict, repr=False)
     _vocabulary: Set[str] = field(default=None, repr=False)
@@ -122,9 +123,12 @@ class TextAnalyser:
     @property
     def tokenized_captions(self) -> pd.Series:
         if self._tokenized_captions is None:
-            self._tokenized_captions = self.data["caption"].apply(
-                self.tokenizer.tokenize
-            )
+            tokens = self.data["caption"].apply(self.tokenizer.tokenize)
+            if self.remove_stopwords:
+                tokens = tokens.apply(
+                    lambda x: [w for w in x if w not in self._stopwords]
+                )
+            self._tokenized_captions = tokens
         return self._tokenized_captions
 
     @property
