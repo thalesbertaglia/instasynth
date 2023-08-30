@@ -77,7 +77,8 @@ class EmbeddingGenerator:
     max_tokens = 8000  # the maximum for text-embedding-ada-002 is 8191
 
     def _generate_embedding(self, text: str) -> Any:
-        if len(self.encoding.encode(text)) <= self.max_tokens:
+        encoded_len = len(self.encoding.encode(text))
+        if encoded_len > 0 and encoded_len <= self.max_tokens:
             return np.array(get_embedding(text, self.embedding_model))
         return None
 
