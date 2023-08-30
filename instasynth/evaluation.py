@@ -96,10 +96,19 @@ class TextAnalyser:
     data: pd.DataFrame
     _tokenized_captions: pd.Series = None
     _ngrams: Dict[int, List[str]] = field(default_factory=dict, repr=False)
-    _vocabulary: Set[str] = None
+    _vocabulary: Set[str] = field(default=None, repr=False)
+    _pronoun_frequency: Dict[str, Counter] = field(default=None, repr=False)
     _stopwords: Set[str] = field(default_factory=set, repr=False)
     __HASHTAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"#(\w+)")
     __USER_TAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"@(\w+)")
+    __PRONOUNS: ClassVar[Dict] = {
+        "first_singular": {"i", "me", "my", "mine"},
+        "first_plural": {"we", "us", "our", "ours"},
+        "second_singular": {"you", "your", "yours"},
+        "second_plural": {"you", "your", "yours"},
+        "third_singular": {"he", "him", "his", "she", "her", "hers", "it", "its"},
+        "third_plural": {"they", "them", "their", "theirs"},
+    }
 
     def __post_init__(self):
         if "caption" not in self.data.columns:
@@ -123,6 +132,45 @@ class TextAnalyser:
         if self._vocabulary is None:
             self._vocabulary = set(self.tokenized_captions.sum())
         return self._vocabulary
+
+    @property
+    def pronoun_frequency(self) -> Dict[str, Counter]:
+        if self._pronoun_frequency is None:
+            self._pronoun_frequency = self._compute_pronoun_frequency()
+        return self._pronoun_frequency
+
+    @property
+    def pronoun_category_frequency(self) -> Dict[str, int]:
+        return {
+            category: sum(pronouns_freq.values())
+            for category, pronouns_freq in self.pronoun_frequency.items()
+        }
+
+    @property
+    def pronoun_person_frequency(self) -> Dict[str, int]:
+        return {
+            person: sum(
+                val
+                for cat, val in self.pronoun_category_frequency.items()
+                if cat.startswith(person)
+            )
+            for person in ["first", "second", "third"]
+        }
+
+    def _compute_pronoun_frequency(self) -> Dict[str, Counter]:
+        pronoun_count = {category: Counter() for category in self.__PRONOUNS}
+        unigram_counts = dict(self._get_top_ngrams(n=1, top_k=len(self.vocabulary)))
+        reverse_pronoun_lookup = {
+            pronoun: category
+            for category, pronouns in self.__PRONOUNS.items()
+            for pronoun in pronouns
+        }
+        for unigram, count in unigram_counts.items():
+            unigram = unigram[0]
+            if unigram in reverse_pronoun_lookup:
+                pronoun_count[reverse_pronoun_lookup[unigram]][unigram] += count
+
+        return pronoun_count
 
     def _extract_ngrams(self, n: int) -> List[str]:
         if n not in self._ngrams:
@@ -207,11 +255,18 @@ class TextAnalyser:
     def _get_top_ngrams(self, n: int, top_k: int = 1000) -> List[Tuple[str, int]]:
         return Counter(self._extract_ngrams(n)).most_common(top_k)
 
+    def _pronoun_metrics(self) -> Dict[str, float]:
+        metrics = {}
+        for k in ["first", "second", "third"]:
+            metrics[f"n_{k}_person_pronouns"] = self.pronoun_person_frequency[k]
+        return metrics
+
     def analyse_data(self) -> pd.DataFrame:
         metrics = self._basic_metrics()
         metrics.update(self._pattern_based_metrics())
         metrics.update(self._text_complexity_metrics())
         metrics.update(self._ngram_metrics())
+        metrics.update(self._pronoun_metrics())
         metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
         return metrics_df
 
