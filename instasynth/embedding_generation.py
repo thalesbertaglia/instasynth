@@ -77,7 +77,8 @@ class EmbeddingGenerator:
     encoding = tiktoken.get_encoding(embedding_encoding)
     max_tokens = 8000  # the maximum for text-embedding-ada-002 is 8191
 
-    def __format_text(text):
+    @staticmethod
+    def __format_text(text: str) -> str:
         """Format text for embedding generation"""
         fixed_text = (
             text.replace('"', " ")
