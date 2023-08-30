@@ -247,6 +247,60 @@ class ClassificationAnalyser:
 
 
 @dataclass
+class EmbeddingSimilarityAnalyser:
+    embeddings_storage: EmbeddingStorage
+    real_posts: List[str] = field(repr=False)
+    synthetic_posts: List[str] = field(repr=False)
+    _real_emb_matrix: np.array = field(default=None, init=False, repr=False)
+    _index: faiss.Index = field(default=None, init=False, repr=False)
+
+    @property
+    def real_emb_matrix(self) -> np.array:
+        if self._real_emb_matrix is None:
+            real_emb_data = [
+                self.embeddings_storage.get_embedding(post) for post in self.real_posts
+            ]
+            self._real_emb_matrix = np.array(real_emb_data).astype("float32")
+        return self._real_emb_matrix
+
+    @property
+    def index(self) -> faiss.Index:
+        if self._index is None:
+            d = self.real_emb_matrix.shape[1]
+            self._index = faiss.IndexFlatIP(d)
+            normalized_embeddings = self._normalize(
+                np.copy(self.real_emb_matrix)
+            )  # Copying before normalisation
+            self._index.add(normalized_embeddings.astype("float32"))
+        return self._index
+
+    def _normalize(self, embeddings: np.array) -> np.array:
+        """Normalize the embeddings to make them unit vectors."""
+        faiss.normalize_L2(embeddings)
+        return embeddings
+
+    def compute_similarity(self, k=1) -> Tuple[np.array, np.array]:
+        synthetic_emb_data = [
+            self.embeddings_storage.get_embedding(post) for post in self.synthetic_posts
+        ]
+        synthetic_embeddings = self._normalize(
+            np.array(synthetic_emb_data).astype("float32")
+        )
+        # Search normalized embeddings
+        distances, indices = self.index.search(synthetic_embeddings, k)
+        return distances, indices
+
+    def get_top_n_similar(self, n=5) -> np.array:
+        _, indices = self.compute_similarity(n)
+        return indices
+
+    def average_cosine_similarity(self) -> float:
+        distances, _ = self.compute_similarity(1)
+        avg_similarity = np.mean(distances)
+        return avg_similarity
+
+
+@dataclass
 class ExperimentEvaluator:
     experiment_paths: List[Path]
     # Real dataset to compare with
