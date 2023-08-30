@@ -4,21 +4,21 @@ from typing import Dict, List, Tuple, ClassVar, Set, Union, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pandas as pd
+import numpy as np
 import textstat
 import emoji
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import faiss
 from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-import pandas as pd
-import numpy as np
+from nltk import ngrams
 from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
-import faiss
+
 
 from .embedding_generation import EmbeddingStorage
 
@@ -94,6 +94,7 @@ class ExperimentLoader:
 class TextAnalyser:
     data: pd.DataFrame
     _tokenized_captions: pd.Series = None
+    _vocabulary: Set[str] = None
     _stopwords: Set[str] = field(default_factory=set)
     __HASHTAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"#(\w+)")
     __USER_TAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"@(\w+)")
@@ -117,7 +118,9 @@ class TextAnalyser:
 
     @property
     def vocabulary(self) -> Set[str]:
-        return set(self.tokenized_captions.sum())
+        if self._vocabulary is None:
+            self._vocabulary = set(self.tokenized_captions.sum())
+        return self._vocabulary
 
     def _extract_from_pattern(
         self, tokens: List[str], pattern: re.Pattern
