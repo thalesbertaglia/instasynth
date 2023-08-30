@@ -1,9 +1,10 @@
 import hashlib
 import pickle
+import re
 import numpy as np
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, ClassVar, List
+from typing import Dict, Any, List
 
 import tiktoken
 from openai.embeddings_utils import get_embedding
@@ -76,7 +77,22 @@ class EmbeddingGenerator:
     encoding = tiktoken.get_encoding(embedding_encoding)
     max_tokens = 8000  # the maximum for text-embedding-ada-002 is 8191
 
+    def __format_text(text):
+        """Format text for embedding generation"""
+        fixed_text = (
+            text.replace('"', " ")
+            .replace("'", " ")
+            .replace("“", " ")
+            .replace("’", " ")
+            .replace("‘", " ")
+            .replace("⠀", "")
+            .replace("\\n", " ")
+        )
+        fixed_text = re.sub(r"\s+", " ", fixed_text)
+        return fixed_text
+
     def _generate_embedding(self, text: str) -> Any:
+        text = self.__format_text(text)
         encoded_len = len(self.encoding.encode(text))
         if encoded_len > 0 and encoded_len <= self.max_tokens:
             return np.array(get_embedding(text, self.embedding_model))
