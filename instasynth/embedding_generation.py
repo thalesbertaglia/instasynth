@@ -4,7 +4,7 @@ import re
 import numpy as np
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 import tiktoken
 from openai.embeddings_utils import get_embedding
@@ -70,7 +70,7 @@ class EmbeddingStorage:
 @dataclass
 class EmbeddingGenerator:
     embedding_storage: EmbeddingStorage
-    texts: List[str]
+    texts: Optional[List[str]] = None
     embeddings: Dict[str, Any] = field(default_factory=dict, repr=False)
     embedding_model = "text-embedding-ada-002"
     embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
@@ -100,7 +100,7 @@ class EmbeddingGenerator:
             return np.array(get_embedding(text, self.embedding_model))
         return None
 
-    def _generate_and_store_embedding(self, text: str) -> None:
+    def generate_and_store_embedding(self, text: str) -> None:
         if not self.embedding_storage.check_if_embedded(text):
             embedding = self._generate_embedding(text)
             self.embeddings[text] = embedding
@@ -110,4 +110,4 @@ class EmbeddingGenerator:
         for i, text in enumerate(self.texts):
             if i % 100 == 0 and self.verbose:
                 logger.info(f"Generating embedding for text {i+1}/{len(self.texts)}")
-            self._generate_and_store_embedding(text)
+            self.generate_and_store_embedding(text)
