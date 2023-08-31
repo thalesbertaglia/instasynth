@@ -1,5 +1,6 @@
 import re
 import json
+import string
 from typing import Dict, List, Tuple, ClassVar, Set, Union, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,8 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from nltk import ngrams
 from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
+from gensim import corpora, models
+from gensim.models.coherencemodel import CoherenceModel
 
 
 from .embedding_generation import EmbeddingStorage
@@ -275,6 +278,81 @@ class TextAnalyser:
         metrics.update(self._pronoun_metrics())
         metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
         return metrics_df
+
+
+@dataclass
+class TopicModellingAnalyser:
+    data: pd.DataFrame
+    num_topics: int = 10
+    _corpus: list = field(default_factory=list, repr=False)
+    _id2word: corpora.Dictionary = field(default=None, repr=False)
+    _lda_model: models.LdaModel = field(default=None, repr=False)
+    _tokenizer: TweetTokenizer = field(default_factory=TweetTokenizer, repr=False)
+    __stopwords: ClassVar[Set[str]] = set(stopwords.words("english"))
+
+    def __post_init__(self):
+        if "caption" not in self.data.columns:
+            raise ValueError("DataFrame must contain 'caption' column.")
+        if "type" not in self.data.columns:
+            raise ValueError(
+                "DataFrame must contain 'type' column indicating 'real' or 'synthetic'."
+            )
+        self.prepare_data()
+
+    def prepare_data(self) -> None:
+        self.data["tokenized"] = (
+            self.data["caption"]
+            .str.lower()
+            .apply(
+                lambda x: [
+                    w
+                    for w in self._tokenizer.tokenize(x)
+                    if w not in self.__stopwords and w not in string.punctuation
+                ]
+            )
+        )
+        self._id2word = corpora.Dictionary(self.data["tokenized"])
+        self._corpus = [self._id2word.doc2bow(text) for text in self.data["tokenized"]]
+
+    def build_lda_model(self) -> None:
+        self._lda_model = models.LdaModel(
+            corpus=self._corpus, id2word=self._id2word, num_topics=self.num_topics
+        )
+
+    def get_topics(self) -> List[Tuple[int, str]]:
+        if not self._lda_model:
+            raise ValueError(
+                "LDA Model has not been built. Run build_lda_model() first."
+            )
+        return self._lda_model.print_topics()
+
+    def coherence_score(self) -> float:
+        coherence_model = CoherenceModel(
+            model=self._lda_model,
+            texts=self.data["tokenized"],
+            dictionary=self._id2word,
+            coherence="c_v",
+        )
+        return coherence_model.get_coherence()
+
+    def compare_topics(self, real_or_synthetic: str) -> List[Tuple[int, str]]:
+        filtered_data = self.data[self.data["type"] == real_or_synthetic]
+        id2word = corpora.Dictionary(filtered_data["tokenized"])
+        corpus = [id2word.doc2bow(text) for text in filtered_data["tokenized"]]
+        lda_model = models.LdaModel(
+            corpus=corpus, id2word=id2word, num_topics=self.num_topics
+        )
+        return lda_model.print_topics()
+
+    def analyse_data(self) -> Dict[str, Union[float, List[Tuple[int, str]]]]:
+        self.build_lda_model()
+        metrics = {
+            "All Topics": self.get_topics(),
+            "Real Data Topics": self.compare_topics("real"),
+            "Synthetic Data Topics": self.compare_topics("synthetic"),
+            "Coherence Score": self.coherence_score(),
+        }
+        return metrics
 
 
 @dataclass
