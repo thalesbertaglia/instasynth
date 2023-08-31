@@ -339,6 +339,7 @@ class EmbeddingSimilarityAnalyser:
     real_posts: List[str] = field(repr=False)
     synthetic_posts: List[str] = field(repr=False)
     _real_emb_matrix: np.array = field(default=None, init=False, repr=False)
+    _synthetic_emb_matrix: np.array = field(default=None, init=False, repr=False)
     _index: faiss.Index = field(default=None, init=False, repr=False)
 
     @property
@@ -349,6 +350,16 @@ class EmbeddingSimilarityAnalyser:
             ]
             self._real_emb_matrix = np.array(real_emb_data).astype("float32")
         return self._real_emb_matrix
+
+    @property
+    def synthetic_emb_matrix(self) -> np.array:
+        if self._synthetic_emb_matrix is None:
+            synthetic_emb_data = [
+                self.embeddings_storage.get_embedding(post)
+                for post in self.synthetic_posts
+            ]
+            self._synthetic_emb_matrix = np.array(synthetic_emb_data).astype("float32")
+        return self._synthetic_emb_matrix
 
     @property
     def index(self) -> faiss.Index:
@@ -376,6 +387,22 @@ class EmbeddingSimilarityAnalyser:
         # Search normalized embeddings
         distances, indices = self.index.search(synthetic_embeddings, k)
         return distances, indices
+
+    def _compute_internal_similarity(self, emb_matrix: np.array) -> float:
+        normalized_embeddings = self._normalize(np.copy(emb_matrix))
+        similarity_matrix = normalized_embeddings @ normalized_embeddings.T
+        np.fill_diagonal(similarity_matrix, np.nan)
+        return np.nanmean(similarity_matrix)
+
+    def _internal_similarity_metrics(self) -> Dict[str, float]:
+        return {
+            "real_internal_cosine_sim": self._compute_internal_similarity(
+                self.real_emb_matrix
+            ),
+            "synthetic_internal_cosine_sim": self._compute_internal_similarity(
+                self.synthetic_emb_matrix
+            ),
+        }
 
     def get_top_n_similar(self, n=5) -> np.array:
         _, indices = self.compute_similarity(n)
@@ -412,6 +439,7 @@ class EmbeddingSimilarityAnalyser:
         metrics = self._cosine_similarity_metrics()
         for k in [1, 10, 100]:
             metrics[f"top_{k}_recall_cosine_sim"] = self._top_k_recall(k)
+        metrics.update(self._internal_similarity_metrics())
         return metrics
 
 
