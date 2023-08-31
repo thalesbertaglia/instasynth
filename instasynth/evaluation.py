@@ -613,7 +613,3 @@ class ExperimentEvaluator:
                     df[col] = np.nan
 
         return pd.concat(dfs, axis=0)
-
-    def visualise_metrics(self):
-        # This can be filled with specific visualization code (e.g., using matplotlib or seaborn)
-        pass
