@@ -100,14 +100,14 @@ class EmbeddingGenerator:
             return np.array(get_embedding(text, self.embedding_model))
         return None
 
+    def _generate_and_store_embedding(self, text: str) -> None:
+        if not self.embedding_storage.check_if_embedded(text):
+            embedding = self._generate_embedding(text)
+            self.embeddings[text] = embedding
+            self.embedding_storage.store_embedding(text, embedding)
+
     def generate_and_store(self) -> None:
         for i, text in enumerate(self.texts):
-            if i % 100 == 0:
-                if self.verbose:
-                    logger.info(
-                        f"Generating embedding for text {i+1}/{len(self.texts)}"
-                    )
-            if not self.embedding_storage.check_if_embedded(text):
-                embedding = self._generate_embedding(text)
-                self.embeddings[text] = embedding
-                self.embedding_storage.store_embedding(text, embedding)
+            if i % 100 == 0 and self.verbose:
+                logger.info(f"Generating embedding for text {i+1}/{len(self.texts)}")
+            self._generate_and_store_embedding(text)
