@@ -381,10 +381,38 @@ class EmbeddingSimilarityAnalyser:
         _, indices = self.compute_similarity(n)
         return indices
 
-    def average_cosine_similarity(self) -> float:
+    def _top_k_recall(self, k=5) -> float:
+        """
+        Computes the Top-k Recall. It checks if the corresponding real caption is in the top-k
+        most similar real captions for a synthetic one and then computes the fraction for which this is true.
+        """
+        indices = self.get_top_n_similar(k)
+        recall_hits = sum([i in idx for i, idx in enumerate(indices)])
+        return recall_hits / len(self.synthetic_posts)
+
+    def _cosine_similarity_metrics(self) -> Dict[str, float]:
+        """
+        Computes statistics of the cosine similarity distribution.
+        """
         distances, _ = self.compute_similarity(1)
-        avg_similarity = np.mean(distances)
-        return avg_similarity
+
+        metrics = {
+            "avg_cosine_sim": np.mean(distances),
+            "median_cosine_sim": np.median(distances),
+            "std_cosine_sim": np.std(distances),
+            "q1_cosine_sim": np.percentile(distances, 25),
+            "q3_cosine_sim": np.percentile(distances, 75),
+            "min_cosine_sim": np.min(distances),
+            "max_cosine_sim": np.max(distances),
+        }
+
+        return metrics
+
+    def analyse_similarity(self) -> Dict[str, float]:
+        metrics = self._cosine_similarity_metrics()
+        for k in [1, 10, 100]:
+            metrics[f"top_{k}_recall_cosine_sim"] = self._top_k_recall(k)
+        return metrics
 
 
 @dataclass
