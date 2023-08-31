@@ -262,7 +262,9 @@ class TextAnalyser:
     def _pronoun_metrics(self) -> Dict[str, float]:
         metrics = {}
         for k in ["first", "second", "third"]:
-            metrics[f"n_{k}_person_pronouns"] = self.pronoun_person_frequency[k]
+            metrics[f"pct_{k}_person_pronouns"] = self.pronoun_person_frequency[
+                k
+            ] / sum(self.pronoun_person_frequency.values())
         return metrics
 
     def analyse_data(self) -> pd.DataFrame:
