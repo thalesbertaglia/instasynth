@@ -76,6 +76,7 @@ class EmbeddingGenerator:
     embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
     encoding = tiktoken.get_encoding(embedding_encoding)
     max_tokens = 8000  # the maximum for text-embedding-ada-002 is 8191
+    verbose: bool = True
 
     @staticmethod
     def __format_text(text: str) -> str:
@@ -102,7 +103,10 @@ class EmbeddingGenerator:
     def generate_and_store(self) -> None:
         for i, text in enumerate(self.texts):
             if i % 100 == 0:
-                logger.info(f"Generating embedding for text {i+1}/{len(self.texts)}")
+                if self.verbose:
+                    logger.info(
+                        f"Generating embedding for text {i+1}/{len(self.texts)}"
+                    )
             if not self.embedding_storage.check_if_embedded(text):
                 embedding = self._generate_embedding(text)
                 self.embeddings[text] = embedding
