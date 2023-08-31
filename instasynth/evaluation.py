@@ -538,21 +538,6 @@ class ExperimentEvaluator:
         default_factory=dict, init=False
     )
 
-    def _load_and_analyse_experiment(self, path: Path) -> Dict[str, Union[int, float]]:
-        loader = ExperimentLoader(path)
-        data = loader.get_experiment_final_df().dropna()
-        analyser = TextAnalyser(data)
-        data_metrics = analyser.analyse_data().to_dict()["Value"]
-        if self.test_dataset_ads is not None:
-            classifier = ClassificationAnalyser(
-                data=data,
-                evaluation_data=self.test_dataset_ads,
-                evaluation_data_ann=self.test_dataset_ads_undisclosed,
-            )
-            data_metrics.update(classifier.ad_detection_performance())
-        data_metrics.update(loader.extract_metrics())
-        return data_metrics
-
     def load_experiment_metrics(self):
         """Loads and analyses metrics for all experiments."""
         for path in self.experiment_paths:
@@ -564,19 +549,33 @@ class ExperimentEvaluator:
                 path
             )
 
-    def load_real_dataset_metrics(self):
-        """Loads and analyses metrics for the real dataset."""
-        if self.real_dataset is None:
-            raise ValueError("Real dataset not provided.")
-        analyser = TextAnalyser(self.real_dataset)
-        self._real_dataset_metrics = analyser.analyse_data().to_dict()["Value"]
+    def _analyse_and_get_metrics(self, data, metrics: dict = None):
+        analyser = TextAnalyser(data)
+        data_metrics = analyser.analyse_data().to_dict()["Value"]
         if self.test_dataset_ads is not None:
             classifier = ClassificationAnalyser(
-                data=self.real_dataset,
+                data=data,
                 evaluation_data=self.test_dataset_ads,
                 evaluation_data_ann=self.test_dataset_ads_undisclosed,
             )
-            self._real_dataset_metrics.update(classifier.ad_detection_performance())
+            data_metrics.update(classifier.ad_detection_performance())
+
+        if metrics:
+            data_metrics.update(metrics)
+
+        return data_metrics
+
+    def _load_and_analyse_experiment(self, path: Path) -> Dict[str, Union[int, float]]:
+        loader = ExperimentLoader(path)
+        data = loader.get_experiment_final_df().dropna()
+        data_metrics = self._analyse_and_get_metrics(data)
+        data_metrics.update(loader.extract_metrics())
+        return data_metrics
+
+    def load_real_dataset_metrics(self):
+        if self.real_dataset is None:
+            raise ValueError("Real dataset not provided.")
+        self._real_dataset_metrics = self._analyse_and_get_metrics(self.real_dataset)
 
     def compare_metrics(self) -> pd.DataFrame:
         if not self._experiment_metrics or not self._real_dataset_metrics:
