@@ -81,26 +81,18 @@ class EmbeddingGenerator:
     @staticmethod
     def __format_text(text: str) -> str:
         """Format text for embedding generation"""
-        fixed_text = (
-            text.replace('"', " ")
-            .replace("'", " ")
-            .replace("“", " ")
-            .replace("’", " ")
-            .replace("‘", " ")
-            .replace("⠀", "")
-            .replace("\\n", " ")
-        )
+        fixed_text = text.replace("\\n", " ").replace("\\t", " ")
         fixed_text = re.sub(r"\s+", " ", fixed_text)
         return fixed_text
 
     def _generate_embedding(self, text: str) -> Any:
-        text = self.__format_text(text)
         encoded_len = len(self.encoding.encode(text))
         if encoded_len > 0 and encoded_len <= self.max_tokens:
             return np.array(get_embedding(text, self.embedding_model))
         return None
 
     def generate_and_store_embedding(self, text: str) -> None:
+        text = self.__format_text(text)
         if not self.embedding_storage.check_if_embedded(text):
             embedding = self._generate_embedding(text)
             self.embeddings[text] = embedding
