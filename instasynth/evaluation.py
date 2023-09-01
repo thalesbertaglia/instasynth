@@ -551,7 +551,7 @@ class ExperimentEvaluator:
             )
 
     def _analyse_and_get_metrics(
-        self, data: pd.DataFrame, metrics: dict = None
+        self, data: pd.DataFrame, metrics: dict = None, analyse_embeddings: bool = True
     ) -> Dict[str, float]:
         analyser = TextAnalyser(data)
         # Basic metrics
@@ -565,7 +565,7 @@ class ExperimentEvaluator:
             )
             data_metrics.update(classifier.ad_detection_performance())
         # Embedding similarity metrics
-        if self.embedding_storage is not None:
+        if self.embedding_storage is not None and analyse_embeddings:
             data_metrics.update(self._analyse_embedding_metrics(data))
         if metrics:
             data_metrics.update(metrics)
@@ -603,7 +603,9 @@ class ExperimentEvaluator:
     def load_real_dataset_metrics(self):
         if self.real_dataset is None:
             raise ValueError("Real dataset not provided.")
-        self._real_dataset_metrics = self._analyse_and_get_metrics(self.real_dataset)
+        self._real_dataset_metrics = self._analyse_and_get_metrics(
+            self.real_dataset, analyse_embeddings=False
+        )
 
     def compare_metrics(self) -> pd.DataFrame:
         if not self._experiment_metrics or not self._real_dataset_metrics:
