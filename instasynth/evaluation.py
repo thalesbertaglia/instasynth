@@ -424,7 +424,8 @@ class EmbeddingSimilarityAnalyser:
     def real_emb_matrix(self) -> np.array:
         if self._real_emb_matrix is None:
             real_emb_data = [
-                self.embeddings_storage.get_embedding(post) for post in self.real_posts
+                self.embeddings_storage.get_embedding(self.__format_text(post))
+                for post in self.real_posts
             ]
             self._real_emb_matrix = np.array(real_emb_data).astype("float32")
         return self._real_emb_matrix
@@ -433,7 +434,7 @@ class EmbeddingSimilarityAnalyser:
     def synthetic_emb_matrix(self) -> np.array:
         if self._synthetic_emb_matrix is None:
             synthetic_emb_data = [
-                self.embeddings_storage.get_embedding(post)
+                self.embeddings_storage.get_embedding(self.__format_text(post))
                 for post in self.synthetic_posts
             ]
             self._synthetic_emb_matrix = np.array(synthetic_emb_data).astype("float32")
@@ -450,6 +451,14 @@ class EmbeddingSimilarityAnalyser:
             self._index.add(normalized_embeddings.astype("float32"))
         return self._index
 
+    @staticmethod
+    def __format_text(text: str) -> str:
+        """Format text for embedding generation"""
+        fixed_text = text.lower()
+        fixed_text = text.replace("\\n", " ").replace("\\t", " ")
+        fixed_text = re.sub(r"\s+", " ", fixed_text)
+        return fixed_text
+
     def _normalize(self, embeddings: np.array) -> np.array:
         """Normalize the embeddings to make them unit vectors."""
         faiss.normalize_L2(embeddings)
@@ -457,7 +466,8 @@ class EmbeddingSimilarityAnalyser:
 
     def compute_similarity(self, k=1) -> Tuple[np.array, np.array]:
         synthetic_emb_data = [
-            self.embeddings_storage.get_embedding(post) for post in self.synthetic_posts
+            self.embeddings_storage.get_embedding(self.__format_text(post))
+            for post in self.synthetic_posts
         ]
         synthetic_embeddings = self._normalize(
             np.array(synthetic_emb_data).astype("float32")
@@ -586,7 +596,7 @@ class ExperimentEvaluator:
 
     def _load_and_analyse_experiment(self, path: Path) -> Dict[str, Union[int, float]]:
         loader = ExperimentLoader(path)
-        data = loader.get_experiment_final_df().dropna()
+        data = loader.get_experiment_final_df().dropna().query("caption != ''")
         data_metrics = self._analyse_and_get_metrics(data)
         data_metrics.update(loader.extract_metrics())
         return data_metrics
