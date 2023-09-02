@@ -30,7 +30,7 @@ class EmbeddingStorage:
         self.load_from_disk()
 
     def _generate_hash(self, text: str) -> str:
-        hash = hashlib.sha256(text.encode()).hexdigest()
+        hash = hashlib.sha256(text.encode(errors="replace")).hexdigest()
         self._hash_map[hash] = text
         return hash
 
