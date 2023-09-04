@@ -209,6 +209,8 @@ class TextAnalyser:
 
     def _basic_metrics(self) -> Dict[str, float]:
         return {
+            "pct_unique_captions": len(self.data["caption"].str.lower().unique())
+            / len(self.data),
             "avg_caption_length": self.tokenized_captions.apply(len).mean(),
             "std_caption_length": self.tokenized_captions.apply(len).std(),
             "vocabulary_size": len(self.vocabulary),
@@ -584,7 +586,7 @@ class ExperimentEvaluator:
         real_posts = self.real_dataset["caption"].apply(self.__format_text).tolist()
         synthetic_posts = data["caption"].apply(self.__format_text).tolist()
         EmbeddingGenerator(
-            self.embedding_storage, texts=real_posts + synthetic_posts, verbose=True
+            self.embedding_storage, texts=real_posts + synthetic_posts, verbose=False
         ).generate_and_store()
         embedding_analyser = EmbeddingSimilarityAnalyser(
             embeddings_storage=self.embedding_storage,
