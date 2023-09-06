@@ -516,11 +516,17 @@ class EmbeddingSimilarityAnalyser:
 
         return metrics
 
-    def analyse_similarity(self) -> Dict[str, float]:
+    def analyse_similarity(
+        self,
+        analyse_top_k_recall: bool = True,
+        analyse_internal_similarity: bool = True,
+    ) -> Dict[str, float]:
         metrics = self._cosine_similarity_metrics()
-        for k in [1, 10, 100]:
-            metrics[f"top_{k}_recall_cosine_sim"] = self._top_k_recall(k)
-        metrics.update(self._internal_similarity_metrics())
+        if analyse_top_k_recall:
+            for k in [1, 10, 100]:
+                metrics[f"top_{k}_recall_cosine_sim"] = self._top_k_recall(k)
+        if analyse_internal_similarity:
+            metrics.update(self._internal_similarity_metrics())
         return metrics
 
 
@@ -536,6 +542,8 @@ class SingleExperimentAnalyser:
         test_dataset_ads_undisclosed: pd.DataFrame = None,
         embedding_storage: EmbeddingStorage = None,
         analyse_embeddings: bool = True,
+        analyse_top_k_recall: bool = True,
+        analyse_internal_similarity: bool = True,
     ) -> Dict[str, float]:
         analyser = TextAnalyser(self.data)
         # Basic metrics
@@ -552,7 +560,10 @@ class SingleExperimentAnalyser:
         if embedding_storage is not None and analyse_embeddings:
             data_metrics.update(
                 self._analyse_embedding_metrics(
-                    real_dataset=real_dataset, embedding_storage=embedding_storage
+                    real_dataset=real_dataset,
+                    embedding_storage=embedding_storage,
+                    analyse_top_k_recall=analyse_top_k_recall,
+                    analyse_internal_similarity=analyse_internal_similarity,
                 )
             )
         if metrics:
@@ -561,7 +572,11 @@ class SingleExperimentAnalyser:
         return data_metrics
 
     def _analyse_embedding_metrics(
-        self, real_dataset: pd.DataFrame, embedding_storage: EmbeddingStorage
+        self,
+        real_dataset: pd.DataFrame,
+        embedding_storage: EmbeddingStorage,
+        analyse_top_k_recall: bool = True,
+        analyse_internal_similarity: bool = True,
     ) -> Dict[str, float]:
         real_posts = real_dataset["caption"].apply(format_text).tolist()
         synthetic_posts = self.data["caption"].apply(format_text).tolist()
@@ -573,7 +588,10 @@ class SingleExperimentAnalyser:
             real_posts=real_posts,
             synthetic_posts=synthetic_posts,
         )
-        return embedding_analyser.analyse_similarity()
+        return embedding_analyser.analyse_similarity(
+            analyse_top_k_recall=analyse_top_k_recall,
+            analyse_internal_similarity=analyse_internal_similarity,
+        )
 
 
 @dataclass
