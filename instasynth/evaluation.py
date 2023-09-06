@@ -25,6 +25,7 @@ from gensim.models.coherencemodel import CoherenceModel
 
 
 from .embedding_generation import EmbeddingStorage, EmbeddingGenerator
+from .utils import format_text
 
 
 @dataclass
@@ -524,6 +525,58 @@ class EmbeddingSimilarityAnalyser:
 
 
 @dataclass
+class SingleExperimentAnalyser:
+    data: pd.DataFrame = field(repr=False)
+
+    def analyse_experiment(
+        self,
+        real_dataset: pd.DataFrame = None,
+        metrics: dict = None,
+        test_dataset_ads: pd.DataFrame = None,
+        test_dataset_ads_undisclosed: pd.DataFrame = None,
+        embedding_storage: EmbeddingStorage = None,
+        analyse_embeddings: bool = True,
+    ) -> Dict[str, float]:
+        analyser = TextAnalyser(self.data)
+        # Basic metrics
+        data_metrics = analyser.analyse_data().to_dict()["Value"]
+        # Classification metrics
+        if test_dataset_ads is not None:
+            classifier = ClassificationAnalyser(
+                data=self.data,
+                evaluation_data=test_dataset_ads,
+                evaluation_data_ann=test_dataset_ads_undisclosed,
+            )
+            data_metrics.update(classifier.ad_detection_performance())
+        # Embedding similarity metrics
+        if embedding_storage is not None and analyse_embeddings:
+            data_metrics.update(
+                self._analyse_embedding_metrics(
+                    real_dataset=real_dataset, embedding_storage=embedding_storage
+                )
+            )
+        if metrics:
+            data_metrics.update(metrics)
+
+        return data_metrics
+
+    def _analyse_embedding_metrics(
+        self, real_dataset: pd.DataFrame, embedding_storage: EmbeddingStorage
+    ) -> Dict[str, float]:
+        real_posts = real_dataset["caption"].apply(format_text).tolist()
+        synthetic_posts = self.data["caption"].apply(format_text).tolist()
+        EmbeddingGenerator(
+            embedding_storage, texts=real_posts + synthetic_posts, verbose=False
+        ).generate_and_store()
+        embedding_analyser = EmbeddingSimilarityAnalyser(
+            embeddings_storage=embedding_storage,
+            real_posts=real_posts,
+            synthetic_posts=synthetic_posts,
+        )
+        return embedding_analyser.analyse_similarity()
+
+
+@dataclass
 class ExperimentEvaluator:
     experiment_paths: List[Path]
     # Real dataset to compare with
@@ -552,61 +605,26 @@ class ExperimentEvaluator:
                 path
             )
 
-    def _analyse_and_get_metrics(
-        self, data: pd.DataFrame, metrics: dict = None, analyse_embeddings: bool = True
-    ) -> Dict[str, float]:
-        analyser = TextAnalyser(data)
-        # Basic metrics
-        data_metrics = analyser.analyse_data().to_dict()["Value"]
-        # Classification metrics
-        if self.test_dataset_ads is not None:
-            classifier = ClassificationAnalyser(
-                data=data,
-                evaluation_data=self.test_dataset_ads,
-                evaluation_data_ann=self.test_dataset_ads_undisclosed,
-            )
-            data_metrics.update(classifier.ad_detection_performance())
-        # Embedding similarity metrics
-        if self.embedding_storage is not None and analyse_embeddings:
-            data_metrics.update(self._analyse_embedding_metrics(data))
-        if metrics:
-            data_metrics.update(metrics)
-
-        return data_metrics
-
-    @staticmethod
-    def __format_text(text: str) -> str:
-        """Format text for embedding generation"""
-        fixed_text = text.lower()
-        fixed_text = fixed_text.replace("\\n", " ").replace("\\t", " ")
-        fixed_text = re.sub(r"\s+", " ", fixed_text)
-        return fixed_text
-
-    def _analyse_embedding_metrics(self, data: pd.DataFrame) -> Dict[str, float]:
-        real_posts = self.real_dataset["caption"].apply(self.__format_text).tolist()
-        synthetic_posts = data["caption"].apply(self.__format_text).tolist()
-        EmbeddingGenerator(
-            self.embedding_storage, texts=real_posts + synthetic_posts, verbose=False
-        ).generate_and_store()
-        embedding_analyser = EmbeddingSimilarityAnalyser(
-            embeddings_storage=self.embedding_storage,
-            real_posts=real_posts,
-            synthetic_posts=synthetic_posts,
-        )
-        return embedding_analyser.analyse_similarity()
-
     def _load_and_analyse_experiment(self, path: Path) -> Dict[str, Union[int, float]]:
         loader = ExperimentLoader(path)
         data = loader.get_experiment_final_df().dropna().query("caption != ''")
-        data_metrics = self._analyse_and_get_metrics(data)
+        data_metrics = SingleExperimentAnalyser(data=data).analyse_experiment(
+            real_dataset=self.real_dataset,
+            test_dataset_ads=self.test_dataset_ads,
+            test_dataset_ads_undisclosed=self.test_dataset_ads_undisclosed,
+            embedding_storage=self.embedding_storage,
+        )
         data_metrics.update(loader.extract_metrics())
         return data_metrics
 
     def load_real_dataset_metrics(self):
         if self.real_dataset is None:
             raise ValueError("Real dataset not provided.")
-        self._real_dataset_metrics = self._analyse_and_get_metrics(
-            self.real_dataset, analyse_embeddings=False
+        self._real_dataset_metrics = SingleExperimentAnalyser(
+            data=self.real_dataset
+        ).analyse_experiment(
+            test_dataset_ads=self.test_dataset_ads,
+            test_dataset_ads_undisclosed=self.test_dataset_ads_undisclosed,
         )
 
     def compare_metrics(self) -> pd.DataFrame:

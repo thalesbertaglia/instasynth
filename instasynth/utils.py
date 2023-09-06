@@ -82,6 +82,14 @@ def format_examples(examples: list, delimiter: str) -> str:
     return "".join([f"{delimiter}{format_example(example)}\n" for example in examples])
 
 
+def format_text(text: str) -> str:
+    """Format text for embedding generation"""
+    fixed_text = text.lower()
+    fixed_text = fixed_text.replace("\\n", " ").replace("\\t", " ")
+    fixed_text = re.sub(r"\s+", " ", fixed_text)
+    return fixed_text
+
+
 def sample_examples(
     df: pd.DataFrame,
     n_examples: int,
