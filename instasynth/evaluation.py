@@ -4,7 +4,7 @@ import string
 from typing import Dict, List, Tuple, ClassVar, Set, Union, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 
 import pandas as pd
 import numpy as np
@@ -13,6 +13,7 @@ import emoji
 import pandas as pd
 import numpy as np
 import faiss
+import networkx as nx
 from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
@@ -415,6 +416,142 @@ class ClassificationAnalyser:
 
 
 @dataclass
+class NetworkAnalyser:
+    data: pd.DataFrame
+    _hashtag_network: nx.Graph = field(default=None, repr=False, init=False)
+    _usertag_network: nx.Graph = field(default=None, repr=False, init=False)
+    _hashtag_usertag_network: nx.Graph = field(default=None, repr=False, init=False)
+    __HASHTAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"#(\w+)")
+    __USER_TAG_PATTERN: ClassVar[re.Pattern] = re.compile(r"@(\w+)")
+
+    def __post_init__(self):
+        if "caption" not in self.data.columns:
+            raise ValueError("DataFrame must contain 'caption' column.")
+        # Fixing hashtags with multiple consecutive #, usually generated because of the #### separator
+        self.data["caption"] = self.data["caption"].str.replace(r"#{2,}", "#")
+        # Lowercasing
+        self.data["caption"] = self.data["caption"].str.lower()
+        # Creating the corresponding tag columns
+        self.data["hashtags"] = self.data["caption"].apply(
+            self._extract_from_pattern, pattern=self.__HASHTAG_PATTERN
+        )
+        self.data["usertags"] = self.data["caption"].apply(
+            self._extract_from_pattern, pattern=self.__USER_TAG_PATTERN
+        )
+
+    @staticmethod
+    def _extract_from_pattern(caption: str, pattern: re.Pattern) -> list:
+        return pattern.findall(caption)
+
+    @staticmethod
+    def _create_cooccurrence_network(tags_list: pd.Series) -> nx.Graph:
+        G = nx.Graph()
+        for tags in tags_list:
+            for i, tag in enumerate(tags):
+                if G.has_node(tag):
+                    G.nodes[tag]["count"] = G.nodes[tag].get("count", 0) + 1
+                else:
+                    G.add_node(tag, count=1)
+                for j in range(i + 1, len(tags)):
+                    if G.has_edge(tag, tags[j]):
+                        G[tag][tags[j]]["weight"] += 1
+                    else:
+                        G.add_edge(tag, tags[j], weight=1)
+        return G
+
+    @staticmethod
+    def _create_cooccurrence_bipartite_network(
+        hashtags: pd.Series, usertags: pd.Series
+    ) -> nx.Graph:
+        G = nx.Graph()
+        for i in range(len(hashtags)):
+            hashtag_list = hashtags.iloc[i]
+            usertag_list = usertags.iloc[i]
+
+            # Add hashtag nodes to the network with a type attribute
+            for hashtag in hashtag_list:
+                if not G.has_node(hashtag):
+                    G.add_node(hashtag, type="hashtag", count=1)
+                else:
+                    G.nodes[hashtag]["count"] = G.nodes[hashtag].get("count", 0) + 1
+
+            # Add usertag nodes to the network with a type attribute
+            for usertag in usertag_list:
+                if not G.has_node(usertag):
+                    G.add_node(usertag, type="usertag")
+
+            # Create edges between cooccurring hashtags and usertags
+            for hashtag in hashtag_list:
+                for usertag in usertag_list:
+                    if G.has_edge(hashtag, usertag):
+                        G[hashtag][usertag]["weight"] += 1
+                    else:
+                        G.add_edge(hashtag, usertag, weight=1)
+
+        return G
+
+    @property
+    def hashtag_network(self):
+        if self._hashtag_network is None:
+            self._hashtag_network = self._create_cooccurrence_network(
+                self.data["hashtags"]
+            )
+        return self._hashtag_network
+
+    @property
+    def usertag_network(self):
+        if self._usertag_network is None:
+            self._usertag_network = self._create_cooccurrence_network(
+                self.data["usertags"]
+            )
+        return self._usertag_network
+
+    @property
+    def hashtag_usertag_network(self):
+        if self._hashtag_usertag_network is None:
+            self._hashtag_usertag_network = self._create_cooccurrence_bipartite_network(
+                self.data["hashtags"], self.data["usertags"]
+            )
+        return self._hashtag_usertag_network
+
+    def _get_network_metrics(self, G: nx.Graph) -> dict:
+        metrics = {
+            "number_of_nodes": G.number_of_nodes(),
+            "number_of_edges": G.number_of_edges(),
+            "density": nx.density(G),
+            "avg_clustering_coefficient": nx.average_clustering(G),
+            "avg_degree": sum(dict(G.degree()).values()) / G.number_of_nodes(),
+            "avg_betweenness_centrality": sum(nx.betweenness_centrality(G).values())
+            / G.number_of_nodes(),
+            "avg_closeness_centrality": sum(nx.closeness_centrality(G).values())
+            / G.number_of_nodes(),
+            "avg_eigenvector_centrality": sum(
+                nx.eigenvector_centrality_numpy(G).values()
+            )
+            / G.number_of_nodes(),
+            "assortativity": nx.degree_assortativity_coefficient(G),
+            "transitivity": nx.transitivity(G),
+        }
+
+        return metrics
+
+    def analyse_data(self) -> pd.DataFrame:
+        metrics = {}
+        networks = {
+            "hashtag": self.hashtag_network,
+            "usertag": self.usertag_network,
+            "hashtag_usertag": self.hashtag_usertag_network,
+        }
+        for name, G in networks.items():
+            if not nx.is_empty(G):
+                network_metrics = self._get_network_metrics(G)
+                for metric, value in network_metrics.items():
+                    metrics[f"{name}_{metric}"] = value
+        metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
+        return metrics_df
+
+
+@dataclass
 class EmbeddingSimilarityAnalyser:
     embeddings_storage: EmbeddingStorage
     real_posts: List[str] = field(repr=False)
@@ -556,6 +693,10 @@ class SingleExperimentAnalyser:
                 evaluation_data_ann=test_dataset_ads_undisclosed,
             )
             data_metrics.update(classifier.ad_detection_performance())
+        # Network metrics
+        nw_analyser = NetworkAnalyser(self.data)
+        nw_metrics = nw_analyser.analyse_data().to_dict()["Value"]
+        data_metrics.update({f"NW_{k}": v for k, v in nw_metrics.items()})
         # Embedding similarity metrics
         if embedding_storage is not None and analyse_embeddings:
             data_metrics.update(
