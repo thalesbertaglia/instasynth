@@ -23,6 +23,7 @@ from nltk.tokenize import TweetTokenizer
 from nltk.corpus import stopwords
 from gensim import corpora, models
 from gensim.models.coherencemodel import CoherenceModel
+from rouge import Rouge
 
 
 from .embedding_generation import EmbeddingStorage, EmbeddingGenerator
@@ -122,8 +123,6 @@ class TextAnalyser:
 
         self._stopwords = set(stopwords.words("english"))
         self.tokenizer = TweetTokenizer(preserve_case=False)
-        # Fixing hashtags with multiple consecutive #, usually generated because of the #### separator
-        self.data["caption"] = self.data["caption"].str.replace(r"#{2,}", "#")
 
     @property
     def tokenized_captions(self) -> pd.Series:
@@ -266,6 +265,37 @@ class TextAnalyser:
     def _get_top_ngrams(self, n: int, top_k: int = 1000) -> List[Tuple[str, int]]:
         return Counter(self._extract_ngrams(n)).most_common(top_k)
 
+    def _compute_jaccard_similarity(self, other: "TextAnalyser", n: int) -> float:
+        # Get n-grams for both datasets
+        self_ngrams = set(self._extract_ngrams(n))
+        other_ngrams = set(other._extract_ngrams(n))
+        # Compute Jaccard similarity
+        intersection = len(self_ngrams.intersection(other_ngrams))
+        union = len(self_ngrams.union(other_ngrams))
+
+        return intersection / union if union != 0 else 0
+
+    def _tag_overlap_metrics(self, other: "TextAnalyser") -> Dict[str, float]:
+        metrics = {}
+        tag_identifiers = {"#": "hashtag", "@": "user_tag"}
+        self_vocab = {
+            tag: set([w for w in self.vocabulary if w.startswith(tag)])
+            for tag in tag_identifiers
+        }
+        other_vocab = {
+            tag: set([w for w in other.vocabulary if w.startswith(tag)])
+            for tag in tag_identifiers
+        }
+        for tag, identifier in tag_identifiers.items():
+            intersection = len(self_vocab[tag].intersection(other_vocab[tag]))
+            union = len(self_vocab[tag].union(other_vocab[tag]))
+            metrics[f"{identifier}_overlap"] = intersection / union if union != 0 else 0
+        return metrics
+
+    def compare_jaccard_similarity(self, other: "TextAnalyser", n: int) -> float:
+        """Compare the current dataset with another using Jaccard similarity."""
+        return self._compute_jaccard_similarity(other, n)
+
     def _pronoun_metrics(self) -> Dict[str, float]:
         metrics = {}
         for k in ["first", "second", "third"]:
@@ -274,12 +304,18 @@ class TextAnalyser:
             ] / sum(self.pronoun_person_frequency.values())
         return metrics
 
-    def analyse_data(self) -> pd.DataFrame:
+    def analyse_data(self, compare_ta: "TextAnalyser" = None) -> pd.DataFrame:
         metrics = self._basic_metrics()
         metrics.update(self._pattern_based_metrics())
         metrics.update(self._text_complexity_metrics())
         metrics.update(self._ngram_metrics())
         metrics.update(self._pronoun_metrics())
+        if compare_ta is not None:
+            for n in range(1, 4):
+                metrics[
+                    f"jaccard_similarity_{n}gram"
+                ] = self.compare_jaccard_similarity(compare_ta, n)
+            metrics.update(self._tag_overlap_metrics(compare_ta))
         metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
         return metrics_df
 
@@ -427,10 +463,6 @@ class NetworkAnalyser:
     def __post_init__(self):
         if "caption" not in self.data.columns:
             raise ValueError("DataFrame must contain 'caption' column.")
-        # Fixing hashtags with multiple consecutive #, usually generated because of the #### separator
-        self.data["caption"] = self.data["caption"].str.replace(r"#{2,}", "#")
-        # Lowercasing
-        self.data["caption"] = self.data["caption"].str.lower()
         # Creating the corresponding tag columns
         self.data["hashtags"] = self.data["caption"].apply(
             self._extract_from_pattern, pattern=self.__HASHTAG_PATTERN
@@ -552,6 +584,74 @@ class NetworkAnalyser:
 
 
 @dataclass
+class NgramSimilarityAnalyser:
+    real_posts: List[str] = field(repr=False)
+    synthetic_posts: List[str] = field(repr=False)
+    _rouge: Rouge = field(default_factory=Rouge, init=False, repr=False)
+
+    def compute_rouge_n(self, n: int) -> List[float]:
+        scores = []
+        for real, synthetic in zip(self.real_posts, self.synthetic_posts):
+            score = self._rouge.get_scores(synthetic, real, avg=True)[f"rouge-{n}"]["f"]
+            scores.append(score)
+        return scores
+
+    def _compute_internal_rouge_n(self, posts: List[str], n: int) -> float:
+        total_scores = 0
+        total_pairs = 0
+
+        for i, post1 in enumerate(posts):
+            for j, post2 in enumerate(posts):
+                if i != j:  # Avoid comparing the post with itself
+                    score = self._rouge.get_scores(post1, post2, avg=True)[
+                        f"rouge-{n}"
+                    ]["f"]
+                    total_scores += score
+                    total_pairs += 1
+
+        return total_scores / total_pairs if total_pairs != 0 else 0
+
+    def _internal_ngram_similarity_metrics(self, max_n: int) -> Dict[str, float]:
+        metrics = {}
+
+        for n in range(1, max_n + 1):
+            real_internal_score = self._compute_internal_rouge_n(self.real_posts, n)
+            synthetic_internal_score = self._compute_internal_rouge_n(
+                self.synthetic_posts, n
+            )
+
+            metrics[f"avg_internal_rouge_{n}_real"] = real_internal_score
+            metrics[f"avg_internal_rouge_{n}_synthetic"] = synthetic_internal_score
+
+        return metrics
+
+    def _ngram_similarity_metrics(self, n: int) -> Dict[str, float]:
+        scores = self.compute_rouge_n(n)
+
+        metrics = {
+            f"avg_rouge_{n}": np.mean(scores),
+            f"median_rouge_{n}": np.median(scores),
+            f"std_rouge_{n}": np.std(scores),
+            f"q1_rouge_{n}": np.percentile(scores, 25),
+            f"q3_rouge_{n}": np.percentile(scores, 75),
+            f"min_rouge_{n}": np.min(scores),
+            f"max_rouge_{n}": np.max(scores),
+        }
+
+        return metrics
+
+    def analyse_ngram_similarity(
+        self, max_n: int = 2, analyse_internal: bool = True
+    ) -> Dict[str, float]:
+        metrics = {}
+        for n in range(1, max_n + 1):
+            metrics.update(self._ngram_similarity_metrics(n))
+        if analyse_internal:
+            metrics.update(self._internal_ngram_similarity_metrics(max_n))
+        return metrics
+
+
+@dataclass
 class EmbeddingSimilarityAnalyser:
     embeddings_storage: EmbeddingStorage
     real_posts: List[str] = field(repr=False)
@@ -670,6 +770,11 @@ class EmbeddingSimilarityAnalyser:
 @dataclass
 class SingleExperimentAnalyser:
     data: pd.DataFrame = field(repr=False)
+
+    def __post_init__(self):
+        # Fixing hashtags with multiple consecutive #, usually generated because of the #### separator
+        self.data["caption"] = self.data["caption"].str.replace(r"#{2,}", "#")
+        self.data["caption"] = self.data["caption"].str.lower()
 
     def analyse_experiment(
         self,
