@@ -788,8 +788,9 @@ class SingleExperimentAnalyser:
         analyse_internal_similarity: bool = True,
     ) -> Dict[str, float]:
         analyser = TextAnalyser(self.data)
+        real_data_ta = TextAnalyser(real_dataset) if real_dataset is not None else None
         # Basic metrics
-        data_metrics = analyser.analyse_data().to_dict()["Value"]
+        data_metrics = analyser.analyse_data(compare_ta=real_data_ta).to_dict()["Value"]
         # Classification metrics
         if test_dataset_ads is not None:
             classifier = ClassificationAnalyser(
