@@ -452,7 +452,7 @@ class ClassificationAnalyser:
         return sorted_features[:k], sorted_features[-k:]
 
     def get_all_positive_features(self) -> List[Tuple[str, float]]:
-        return [(name, coef) for name, coef in self.get_sorted_features() if coef > 0]s
+        return [(name, coef) for name, coef in self.get_sorted_features() if coef > 0]
 
     def ad_detection_performance(self) -> Dict[str, float]:
         X_train, y_train = self._preprocess(self.data)
