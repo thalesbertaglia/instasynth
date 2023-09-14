@@ -438,15 +438,21 @@ class ClassificationAnalyser:
         }
         return metrics
 
-    def get_top_features(self, k: int) -> List[Tuple[str, float]]:
+    def get_sorted_features(self) -> List[Tuple[str, float]]:
         coefficients = self.__MODEL.coef_[0]
         feature_names = self.__VECTORIZER.get_feature_names_out()
         feature_coef_tuples = list(zip(feature_names, coefficients))
-        sorted_feature_coef = sorted(
-            feature_coef_tuples, key=lambda x: x[1], reverse=True
-        )
+        return sorted(feature_coef_tuples, key=lambda x: x[1], reverse=True)
 
-        return sorted_feature_coef[:k], sorted_feature_coef[-k:]
+    def get_top_features(
+        self, k: int
+    ) -> Tuple[List[Tuple[str, float]], List[Tuple[str, float]]]:
+        """Return top k positive and negative features."""
+        sorted_features = self.get_sorted_features()
+        return sorted_features[:k], sorted_features[-k:]
+
+    def get_all_positive_features(self) -> List[Tuple[str, float]]:
+        return [(name, coef) for name, coef in self.get_sorted_features() if coef > 0]s
 
     def ad_detection_performance(self) -> Dict[str, float]:
         X_train, y_train = self._preprocess(self.data)
