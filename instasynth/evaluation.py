@@ -24,6 +24,7 @@ from nltk.corpus import stopwords
 from gensim import corpora, models
 from gensim.models.coherencemodel import CoherenceModel
 from rouge import Rouge
+import statsmodels.api as sm
 
 
 from .embedding_generation import EmbeddingStorage, EmbeddingGenerator
@@ -438,21 +439,24 @@ class ClassificationAnalyser:
         }
         return metrics
 
-    def get_sorted_features(self) -> List[Tuple[str, float]]:
-        coefficients = self.__MODEL.coef_[0]
+    def get_significant_positive_features(
+        self, significance_level=0.05
+    ) -> List[Tuple[str, float]]:
+        """Return all positive features with significant coefficients."""
+        X_train, y_train = self._preprocess(self.data)
+        # Add an intercept to the training data
+        X_with_intercept = sm.add_constant(X_train)
+        model_sm = sm.Logit(y_train, X_with_intercept).fit(disp=0)
+        p_values = model_sm.pvalues
+        p_values = p_values.drop("const")
         feature_names = self.__VECTORIZER.get_feature_names_out()
-        feature_coef_tuples = list(zip(feature_names, coefficients))
-        return sorted(feature_coef_tuples, key=lambda x: x[1], reverse=True)
-
-    def get_top_features(
-        self, k: int
-    ) -> Tuple[List[Tuple[str, float]], List[Tuple[str, float]]]:
-        """Return top k positive and negative features."""
-        sorted_features = self.get_sorted_features()
-        return sorted_features[:k], sorted_features[-k:]
-
-    def get_all_positive_features(self) -> List[Tuple[str, float]]:
-        return [(name, coef) for name, coef in self.get_sorted_features() if coef > 0]
+        feature_info = list(zip(feature_names, self.__MODEL.coef_[0], p_values))
+        significant_positive_features = [
+            (name, coef)
+            for name, coef, p_val in feature_info
+            if coef > 0 and p_val < significance_level
+        ]
+        return significant_positive_features
 
     def ad_detection_performance(self) -> Dict[str, float]:
         X_train, y_train = self._preprocess(self.data)
