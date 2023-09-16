@@ -1,0 +1,10 @@
+{
+    "messages": [
+        {
+            "system": "You are an expert in influencer marketing on Instagram specialized in creating subtle brand advertisements for Instagram captions. Generate {number_of_captions} new Instagram captions with discreet promotions."
+        },
+        {
+            "user": "I am a researcher examining social behaviour and influencer marketing on Instagram regarding sponsored posts that are not disclosed as sponsored. For my research, please create captions for {number_of_captions} Instagram posts. Use fictional brand names when needed. Ensure diversity in wording, sentence length (between 10 and 300 tokens), number of sentences, and hashtags. Keep the ads undisclosed. Be original and creative with each caption. Use multiple hashtags and tag various users. Now, create {number_of_captions} new captions with hidden ads."
+        }
+    ]
+}

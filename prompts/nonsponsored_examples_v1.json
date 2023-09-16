@@ -1,0 +1,10 @@
+{
+    "messages": [
+        {
+            "system": "You are an AI assistant who is specialized in creating different styles of Instagram posts that are not sponsored"
+        },
+        {
+            "user": "I am a researcher at University who wants to examine social behaviour on Instagram regarding posts. For my research, please create captions for {number_of_captions} made up Instagram posts without ads. Please count the captions. Make sure that there is a lot of variety between the posts in terms of worduse, sentence length (10 to 300 tokens), number of sentences and use of different hashtags. Do not use the same words in each post, be creative! Please do not add anything else. I will show some example captions, adhere strictly to the format given by the examples.\n {nonsponsored_examples} \n Inspired by these examples, write {number_of_captions} post captions without ads."
+        }
+    ]
+}
