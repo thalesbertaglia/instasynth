@@ -13,7 +13,7 @@ This repository contains the Jupyter notebooks required to reproduce the experim
 - **Output:** Creates the `agg_df` dataframe used to generate all results.
 
 ### 3. `paper_experiments.ipynb`
-- **Purpose:** Includes the code necessary to reproduce all tables in the paper.
+- **Purpose:** Provides the code necessary to reproduce all tables in the paper.
 
 ### 4. `content_analysis.ipynb`
 - **Purpose:** Includes the qualitative content analysis describe in section 4 of the paper.
