@@ -1,6 +1,6 @@
 # Reproducing the Experiments
 
-This repository contains the Jupyter notebooks required to reproduce the experiments and results presented in our paper. Below, you'll find a brief description of each notebook and its purpose:
+This directory contains the Jupyter notebooks required to reproduce the experiments and results presented in our paper. Below, you'll find a brief description of each notebook and its purpose:
 
 ## Notebooks
 
