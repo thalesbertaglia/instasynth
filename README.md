@@ -1,5 +1,5 @@
 # InstaSynth
-Synthetic Instagram Post Generation for Social Media Research
+Code for the paper InstaSynth: Opportunities and Challenges in Generating Synthetic Instagram Data with chatGPT for Sponsored Content Detection, accept for publication at [ICWSM 2024](icwsm.org/2024).
 
 ### Setting up the Repository
 1. **Clone the Repository:**  
