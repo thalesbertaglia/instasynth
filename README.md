@@ -1,7 +1,7 @@
 # InstaSynth
 Code for the paper _InstaSynth: Opportunities and Challenges in Generating Synthetic Instagram Data with chatGPT for Sponsored Content Detection_, published at [ICWSM 2024](https://www.icwsm.org/2024).
 
-You can read the paper here [here]([https://arxiv.org/abs/2403.15214](https://ojs.aaai.org/index.php/ICWSM/article/download/31303/33463)).
+You can read the paper here [here](https://ojs.aaai.org/index.php/ICWSM/article/download/31303/33463).
 
 ## Reference
 
