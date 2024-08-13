@@ -1,9 +1,22 @@
 # InstaSynth
-Code for the paper InstaSynth: Opportunities and Challenges in Generating Synthetic Instagram Data with chatGPT for Sponsored Content Detection, accept for publication at [ICWSM 2024](https://www.icwsm.org/2024).
+Code for the paper _InstaSynth: Opportunities and Challenges in Generating Synthetic Instagram Data with chatGPT for Sponsored Content Detection_, published at [ICWSM 2024](https://www.icwsm.org/2024).
 
-You can read the pre-print version of the paper on [arXiv](https://arxiv.org/abs/2403.15214).
+You can read the paper here [here]([https://arxiv.org/abs/2403.15214](https://ojs.aaai.org/index.php/ICWSM/article/download/31303/33463)).
 
-### Setting up the Repository
+## Reference
+
+```
+@inproceedings{bertaglia2024instasynth,
+  title={InstaSynth: Opportunities and Challenges in Generating Synthetic Instagram Data with ChatGPT for Sponsored Content Detection},
+  author={Bertaglia, Thales and Heisig, Lily and Kaushal, Rishabh and Iamnitchi, Adriana},
+  booktitle={Proceedings of the International AAAI Conference on Web and Social Media},
+  volume={18},
+  pages={139--151},
+  year={2024}
+}
+```
+
+## Setting up the Repository
 1. **Clone the Repository:**  
    ```bash
    git clone https://github.com/thalesbertaglia/instasynth.git
