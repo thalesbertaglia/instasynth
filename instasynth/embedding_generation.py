@@ -1,15 +1,16 @@
 import hashlib
 import pickle
 import re
-import numpy as np
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
+import numpy as np
 import tiktoken
-from openai.embeddings_utils import get_embedding
 
 from .config import logger
+
+# from openai.embeddings_utils import get_embedding
 
 
 @dataclass
