@@ -1,12 +1,10 @@
-from pathlib import Path
-from typing import List, Dict, Tuple, Union
 from dataclasses import dataclass, field
+from typing import Dict, List, Tuple, Union
 
-import openai
-import pandas as pd
+from litellm import completion
 
-from .config import Config
 from . import utils
+from .config import Config
 
 Config.load_attributes()
 
@@ -16,8 +14,6 @@ class DataGenerator:
     model_parameters: Dict[str, Union[str, float, int, List[Dict[str, str]]]] = field(
         default_factory=lambda: {
             "model": Config.MODEL,
-            "functions": Config.FUNCTIONS,
-            "function_call": Config.FUNCTION_CALL,
             "temperature": Config.TEMPERATURE,
             "frequency_penalty": Config.FREQUENCY_PENALTY,
             "presence_penalty": Config.PRESENCE_PENALTY,
@@ -44,10 +40,11 @@ class DataGenerator:
         self, messages: List[Dict[str, str]]
     ) -> Union[str, Tuple[Dict, str, Dict[str, Union[int, str]]]]:
         try:
-            response = openai.ChatCompletion.create(
-                messages=messages, **self.model_parameters
-            )
-            arguments = response["choices"][0]["message"]["function_call"]["arguments"]
+            response = completion(
+                messages=messages, drop_params=True, **self.model_parameters
+            ).json()
+            arguments = response["choices"][0]["message"]["content"]
+            # arguments = response["choices"][0]["message"]["function_call"]["arguments"]
             return response, arguments
         except Exception as e:
             raise e
