@@ -1,39 +1,36 @@
-import re
 import json
+import re
 import string
-from typing import Dict, List, Tuple, ClassVar, Set, Union, Optional
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections import Counter, defaultdict
+from typing import ClassVar, Dict, List, Optional, Set, Tuple, Union
 
-import pandas as pd
-import numpy as np
-import textstat
 import emoji
-import pandas as pd
-import numpy as np
 import faiss
 import networkx as nx
-from nltk.tokenize import TweetTokenizer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from sklearn.feature_selection import RFE
-from nltk import ngrams
-from nltk.tokenize import TweetTokenizer
-from nltk.corpus import stopwords
+import numpy as np
+import pandas as pd
+import textstat
 from gensim import corpora, models
 from gensim.models.coherencemodel import CoherenceModel
+from nltk import ngrams
+from nltk.corpus import stopwords
+from nltk.tokenize import TweetTokenizer
 from rouge import Rouge
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
-
-from .embedding_generation import EmbeddingStorage, EmbeddingGenerator
+from .embedding_generation import EmbeddingGenerator, EmbeddingStorage
 from .utils import format_text
 
 
 @dataclass
 class ExperimentLoader:
     experiment_path: Path
+    analyse_meta_metrics: bool = field(default=True)
     _errors_path: Path = field(init=False)
     _iterations_path: Path = field(init=False)
     _n_requests: int = field(init=False, default=None)
@@ -58,7 +55,7 @@ class ExperimentLoader:
 
     @property
     def n_errors(self) -> int:
-        if self._n_errors is None:
+        if self._n_errors is None and self._errors_path.exists():
             self._n_errors = len(list(self._errors_path.iterdir()))
         return self._n_errors
 
@@ -71,6 +68,9 @@ class ExperimentLoader:
         return self._captions_per_request
 
     def extract_metrics(self) -> Dict[str, Union[int, float]]:
+        if not self.analyse_meta_metrics:
+            return {}
+
         n_requests = self.load_n_requests()
         n_errors = self.n_errors
         captions_per_request = self.captions_per_request
@@ -83,12 +83,12 @@ class ExperimentLoader:
             "std_captions_per_request": captions_per_request.std(),
             "max_captions_per_request": captions_per_request.max(),
             "min_captions_per_request": captions_per_request.min(),
-            "error_rate": n_errors / n_requests
-            if n_requests != 0
-            else 0,  # Proportion of requests that resulted in errors
-            "success_rate": 1 - (n_errors / n_requests)
-            if n_requests != 0
-            else 0,  # Proportion of successful requests
+            "error_rate": (
+                n_errors / n_requests if n_requests != 0 else 0
+            ),  # Proportion of requests that resulted in errors
+            "success_rate": (
+                1 - (n_errors / n_requests) if n_requests != 0 else 0
+            ),  # Proportion of successful requests
             "total_captions": captions_per_request.sum(),
         }
 
@@ -313,9 +313,9 @@ class TextAnalyser:
         metrics.update(self._pronoun_metrics())
         if compare_ta is not None:
             for n in range(1, 4):
-                metrics[
-                    f"jaccard_similarity_{n}gram"
-                ] = self.compare_jaccard_similarity(compare_ta, n)
+                metrics[f"jaccard_similarity_{n}gram"] = (
+                    self.compare_jaccard_similarity(compare_ta, n)
+                )
             metrics.update(self._tag_overlap_metrics(compare_ta))
         metrics_df = pd.DataFrame.from_dict(metrics, orient="index", columns=["Value"])
         return metrics_df
@@ -733,7 +733,7 @@ class EmbeddingSimilarityAnalyser:
         most similar real captions for a synthetic one and then computes the fraction for which this is true.
         """
         indices = self.get_top_n_similar(k)
-        recall_hits = sum([i in idx for i, idx in enumerate(indices)])
+        recall_hits = sum([True for i, idx in enumerate(indices) if i in idx])
         return recall_hits / len(self.synthetic_posts)
 
     def _cosine_similarity_metrics(self) -> Dict[str, float]:
@@ -851,6 +851,8 @@ class ExperimentEvaluator:
     test_dataset_ads: Optional[pd.DataFrame] = None
     # Test dataset to evaluate ad detection performance on undisclosed ads
     test_dataset_ads_undisclosed: Optional[pd.DataFrame] = None
+    # Whether to analyse "meta" metrics (metrics about the experiment, like error rate etc)
+    analyse_meta_metrics: bool = True
     embedding_storage: Optional[EmbeddingStorage] = None
     _embedding_generator: Optional[EmbeddingGenerator] = field(default=None, init=False)
     _experiment_metrics: Dict[str, Dict[str, Union[int, float]]] = field(
@@ -863,7 +865,9 @@ class ExperimentEvaluator:
     def load_experiment_metrics(self):
         """Loads and analyses metrics for all experiments."""
         for path in self.experiment_paths:
-            loader = ExperimentLoader(path)
+            loader = ExperimentLoader(
+                path, analyse_meta_metrics=self.analyse_meta_metrics
+            )
             identifier = (
                 loader.experiment_path.name
             )  # Assuming the folder name is the identifier
@@ -872,7 +876,7 @@ class ExperimentEvaluator:
             )
 
     def _load_and_analyse_experiment(self, path: Path) -> Dict[str, Union[int, float]]:
-        loader = ExperimentLoader(path)
+        loader = ExperimentLoader(path, analyse_meta_metrics=self.analyse_meta_metrics)
         data = loader.get_experiment_final_df().dropna().query("caption != ''")
         data_metrics = SingleExperimentAnalyser(data=data).analyse_experiment(
             real_dataset=self.real_dataset,
