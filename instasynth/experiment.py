@@ -1,15 +1,15 @@
-import time
 import json
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List
+import time
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pandas as pd
 
+from . import utils
 from .config import Config, logger
 from .data_generation import DataGenerator
-from . import utils
 
 Config.load_attributes()
 
@@ -17,6 +17,7 @@ Config.load_attributes()
 class SavingManager:
     def __init__(self, experiment_identifier: str):
         self.experiment_results_filename = utils.get_pathnames(experiment_identifier)
+        Path(self.experiment_results_filename).mkdir(parents=True, exist_ok=True)
         Path(self.experiment_results_filename / "iterations").mkdir(
             parents=True, exist_ok=True
         )
@@ -80,13 +81,19 @@ class SavingManager:
 
     def save_experiment_setup(self, experiment_data: Dict[str, Any]):
         """Save the experiment setup to a JSON file, ignoring fields marked with 'ignore' in metadata."""
+        clean_experiment_data = experiment_data.copy()
+        if "chatgpt_parameters" in clean_experiment_data:
+            clean_experiment_data["chatgpt_parameters"].pop("response_format", None)
+        if "response_format" in clean_experiment_data:
+            clean_experiment_data.pop("response_format")
 
+        print(clean_experiment_data)
         with open(
             f"{self.experiment_results_filename}/EXPERIMENT_SETUP.json",
             "w",
             encoding="utf8",
         ) as f:
-            json.dump(experiment_data, f, indent=4, ensure_ascii=False)
+            json.dump(clean_experiment_data, f, indent=4, ensure_ascii=False)
 
 
 class Sponsorship(Enum):
@@ -97,6 +104,7 @@ class Sponsorship(Enum):
 @dataclass
 class Experiment:
     experiment_identifier: str
+    model: str
     sponsored_prompt_name: str
     nonsponsored_prompt_name: str
     sponsored_count: int
@@ -118,13 +126,15 @@ class Experiment:
 
     def __post_init__(self):
         logger.name = f"{logger.name} ({self.experiment_identifier})"
+        self.chatgpt_parameters.update({"model": self.model})
         # Adding additional parameters that could be used for the prompt
         if "number_of_captions" not in self.parameters_template:
             self.parameters_template["number_of_captions"] = self.captions_per_prompt
         if "example_delimiter" not in self.parameters_template:
             self.parameters_template["example_delimiter"] = self.example_delimiter
         # Saving the initial experiment setup
-        self.saving_manager: SavingManager = SavingManager(self.experiment_identifier)
+        experiment_id = f"{self.experiment_identifier}-{self.model.replace('-', '_').split('/')[-1]}"
+        self.saving_manager: SavingManager = SavingManager(experiment_id)
 
     def sponsorship_type(self, is_sponsored: bool) -> str:
         return (
@@ -133,7 +143,12 @@ class Experiment:
             else Sponsorship.NON_SPONSORED.value
         )
 
-    def run_single(self, is_sponsored: bool, df_sample: pd.DataFrame = None):
+    def run_single(
+        self,
+        is_sponsored: bool,
+        df_sample: pd.DataFrame = None,
+        random_seed: int = None,
+    ):
         parameters = self.parameters_template.copy()
         sponsorship = self.sponsorship_type(is_sponsored)
         prompt_name = (
@@ -147,10 +162,11 @@ class Experiment:
                 n_examples=self.number_of_examples,
                 is_sponsored=is_sponsored,
                 delimiter=self.example_delimiter,
+                random_seed=random_seed,
             )
-            parameters[
-                f"{sponsorship}_examples"
-            ] = f"<EXAMPLES> {examples} </EXAMPLES>\n\n Now I will give you instructions: "
+            parameters[f"{sponsorship}_examples"] = (
+                f"<EXAMPLES> {examples} </EXAMPLES>\n\n Now I will give you instructions: "
+            )
 
         # If the API fails, sleep for 60 seconds and continue
         try:
@@ -221,11 +237,15 @@ class Experiment:
                 logger.info(
                     f"Generating {sponsorship} posts, iteration {self._iteration_state}. {generated_posts_count}/{sponsorship_count} generated so far."
                 )
-                self.run_single(is_sponsored=is_sponsored, df_sample=df_sample)
+                self.run_single(
+                    is_sponsored=is_sponsored,
+                    df_sample=df_sample,
+                    random_seed=self._iteration_state,
+                )
                 generated_posts_count = sum((len(k) for k in self.results[sponsorship]))
         logger.info("Finished generating all posts!")
         # Saving the setup again to ensure parameters are up to date
-        self.save_experiment_setup()
+        # self.save_experiment_setup()
         df = self.saving_manager.save_final_results(results=self.results)
         return df
 
