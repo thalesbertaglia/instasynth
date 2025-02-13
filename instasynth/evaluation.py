@@ -3,8 +3,9 @@ import re
 import string
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from itertools import product
 from pathlib import Path
-from typing import ClassVar, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
 
 import emoji
 import faiss
@@ -21,7 +22,13 @@ from rouge import Rouge
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_selection import RFE
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 
 from .embedding_generation import EmbeddingGenerator, EmbeddingStorage
 from .utils import format_text
@@ -451,6 +458,80 @@ class ClassificationAnalyser:
             )["ad_detection_undisclosed_accuracy"]
         return performance_metrics
 
+    def _confusion_matrix_metrics(
+        self, y_true: np.ndarray, y_pred: np.ndarray
+    ) -> Dict[str, float]:
+        cm = confusion_matrix(y_true, y_pred, labels=[0, 1]).tolist()
+
+        def safe_div(numerator: float, denominator: float) -> float:
+            try:
+                return numerator / denominator
+            except ZeroDivisionError:
+                return 0.0
+
+        total = sum(map(sum, cm))
+
+        return {
+            "fpr": safe_div(cm[0][1], cm[0][1] + cm[0][0]),
+            "fnr": safe_div(cm[1][0], cm[1][0] + cm[1][1]),
+            "calibration": safe_div(cm[1][1], cm[1][1] + cm[0][1]),
+            "fp": cm[0][1],
+            "fn": cm[1][0],
+            "total_instances": total,
+            "accuracy": safe_div(cm[0][0] + cm[1][1], total),
+            "outcomes_positive_predictions_percent": safe_div(
+                cm[0][1] + cm[1][1], total
+            ),
+            "true_class_positive": safe_div(cm[1][0] + cm[1][1], total),
+        }
+
+    def evaluate_fairness_groups(
+        self, data: pd.DataFrame, group_columns: List[str]
+    ) -> Dict[str, Any]:
+        X, y = self._preprocess(data)
+        y_pred = self.__MODEL.predict(X)
+        fairness_results: Dict[str, Any] = {}
+        # Compute metrics for each group individually
+        for group in group_columns:
+            if group not in data.columns:
+                raise ValueError(f"Group column '{group}' not found in the data.")
+            group_metrics = {}
+            for val in np.unique(data[group].values):
+                mask = data[group].values == val
+                if mask.sum() == 0:
+                    continue
+                group_metrics[val] = self._confusion_matrix_metrics(
+                    y[mask], y_pred[mask]
+                )
+            fairness_results[f"only_{group}"] = group_metrics
+
+        # Compute metrics for the intersection of groups if more than one group is provided
+        if len(group_columns) > 1:
+            intersection_metrics = {}
+            unique_values = {
+                group: np.unique(data[group].values) for group in group_columns
+            }
+            for combo in product(*[unique_values[group] for group in group_columns]):
+                mask = np.ones(len(data), dtype=bool)
+                key_parts = []
+                for group, val in zip(group_columns, combo):
+                    mask &= data[group].values == val
+                    key_parts.append(f"{group}:{val}")
+                if mask.sum() == 0:
+                    continue
+                key = "_".join(key_parts)
+                intersection_metrics[key] = self._confusion_matrix_metrics(
+                    y[mask], y_pred[mask]
+                )
+            fairness_results["intersection"] = intersection_metrics
+
+        return fairness_results
+
+    def fairness_performance_groups(self, group_columns: List[str]) -> Dict[str, Any]:
+        # X_train, y_train = self._preprocess(self.data)
+        # self.train(X_train, y_train)
+        return self.evaluate_fairness_groups(self.evaluation_data_ann, group_columns)
+
 
 @dataclass
 class NetworkAnalyser:
@@ -783,6 +864,7 @@ class SingleExperimentAnalyser:
         metrics: dict = None,
         test_dataset_ads: pd.DataFrame = None,
         test_dataset_ads_undisclosed: pd.DataFrame = None,
+        fairness_groups: Optional[List[str]] = None,
         embedding_storage: EmbeddingStorage = None,
         analyse_embeddings: bool = True,
         analyse_top_k_recall: bool = True,
@@ -800,6 +882,12 @@ class SingleExperimentAnalyser:
                 evaluation_data_ann=test_dataset_ads_undisclosed,
             )
             data_metrics.update(classifier.ad_detection_performance())
+            # Integrate fairness metrics if fairness_groups parameter is provided
+            if fairness_groups:
+                fairness_metrics = classifier.fairness_performance_groups(
+                    fairness_groups
+                )
+                data_metrics.update(fairness_metrics)
         # Network metrics
         nw_analyser = NetworkAnalyser(self.data)
         nw_metrics = nw_analyser.analyse_data().to_dict()["Value"]
@@ -851,6 +939,8 @@ class ExperimentEvaluator:
     test_dataset_ads: Optional[pd.DataFrame] = None
     # Test dataset to evaluate ad detection performance on undisclosed ads
     test_dataset_ads_undisclosed: Optional[pd.DataFrame] = None
+    # List of fairness groups to evaluate fairness metrics (e.g., gender and ethiniciity)
+    fairness_groups: Optional[List[str]] = (None,)
     # Whether to analyse "meta" metrics (metrics about the experiment, like error rate etc)
     analyse_meta_metrics: bool = True
     embedding_storage: Optional[EmbeddingStorage] = None
@@ -882,6 +972,7 @@ class ExperimentEvaluator:
             real_dataset=self.real_dataset,
             test_dataset_ads=self.test_dataset_ads,
             test_dataset_ads_undisclosed=self.test_dataset_ads_undisclosed,
+            fairness_groups=self.fairness_groups,
             embedding_storage=self.embedding_storage,
         )
         data_metrics.update(loader.extract_metrics())
